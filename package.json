@@ -1,0 +1,18 @@
+{
+  "name": "the-architects-descent",
+  "version": "0.0.1-MVP",
+  "description": "A cynical 8-bit platformer about Enterprise Architecture. Ticket: ARCH-1.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "kaboom": "^3000.1.17"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vite": "^5.2.0"
+  }
+}

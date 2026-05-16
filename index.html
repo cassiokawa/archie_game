@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Architect's Descent: 8-Bit Deprecation</title>
+    <style>
+      body {
+        margin: 0;
+        background: #000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        font-family: monospace;
+      }
+      /* ARCH-203: Force pixelated rendering at every level — kaboom's crisp:true
+         already requests nearest-neighbor on the WebGL texture sampler, but
+         this also blocks the browser/OS from re-smoothing the final canvas
+         when the window is resized or DPR-scaled. */
+      canvas, img {
+        image-rendering: pixelated;
+        image-rendering: -moz-crisp-edges;
+        image-rendering: crisp-edges;
+        -ms-interpolation-mode: nearest-neighbor;
+      }</style>
+  </head>
+  <body>
+    <!-- ARCH-2: Mount point for the doomed Legacy Monolith. -->
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
