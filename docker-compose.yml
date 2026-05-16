@@ -1,0 +1,16 @@
+services:
+  archie-game:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: server
+    image: archie-game:latest
+    container_name: archie-cage
+    ports:
+      - "8181:80"       # game available at http://localhost:8181
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
