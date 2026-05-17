@@ -6631,49 +6631,113 @@ k.scene("win", (score: number) => {
 });
 
 // =============================================================================
-// ARCH-400: TITLE SCREEN — Start Game / Options. Simple two-option menu.
+// ARCH-400: TITLE SCREEN — Start Game / Options. Visual splash with Archie + Blueprint.
 // =============================================================================
 k.scene("title", () => {
   const W = k.width(), H = k.height();
-  k.add([k.rect(W, H), k.pos(0, 0), k.color(0, 0, 0)]);
 
-  // Scanlines
+  // ── Background ──────────────────────────────────────────────────────────────
+  k.add([k.rect(W, H), k.pos(0, 0), k.color(6, 4, 18)]);
+  // Subtle scanlines
   for (let y = 0; y < H; y += 4)
     k.add([k.rect(W, 1), k.pos(0, y), k.color(255, 255, 255), k.opacity(0.03)]);
 
-  // Title
+  // Dim ground stripe at the bottom so sprites "stand on" something
+  k.add([k.rect(W, 28), k.pos(0, H - 28), k.color(20, 16, 36)]);
+  k.add([k.rect(W, 2), k.pos(0, H - 28), k.color(192, 58, 43), k.opacity(0.5)]);
+
+  // ── Title ───────────────────────────────────────────────────────────────────
   k.add([
-    k.text("THE\nARCHITECT'S\nDESCENT", { size: 72, align: "center" }),
-    k.pos(W / 2, 140), k.anchor("center"),
-    k.color(192, 58, 43), k.outline(4, k.rgb(0, 0, 0)),
+    k.text("THE\nARCHITECT'S\nDESCENT", { size: 64, align: "center" }),
+    k.pos(W / 2, 126), k.anchor("center"),
+    k.color(192, 58, 43), k.outline(4, k.rgb(0, 0, 0)), k.z(10),
   ]);
 
-  // Coffee-cup icon in bottom-right corner (decorative)
+  // ── ARCHIE — left side, animated walk cycle ──────────────────────────────
+  const ARCHIE_SC = 9;
+  const archieX = 120;
+  const archieY = H - 28 - 34; // "feet on the ground stripe"
+  const archieSprite = k.add([
+    k.sprite("archie"), k.pos(archieX, archieY),
+    k.anchor("bot"), k.scale(ARCHIE_SC), k.z(8),
+  ]);
+  let runT = 0;
+  let currentFrame = "archie";
+  archieSprite.onUpdate(() => {
+    runT += k.dt();
+    // 2-frame run cycle at ~8fps
+    const frame = Math.floor(runT * 8) % 2 === 0 ? "archie_run_a" : "archie_run_b";
+    const bob = Math.sin(runT * 16) * 0.06;
+    archieSprite.scale = k.vec2(ARCHIE_SC * (1 - bob * 0.4), ARCHIE_SC * (1 + bob));
+    if (frame !== currentFrame) {
+      const asset = k.getSprite(frame);
+      if (asset && (asset as any).loaded !== false) {
+        archieSprite.use(k.sprite(frame));
+        currentFrame = frame;
+      }
+    }
+  });
+  // "ARCHIE" label under the sprite
   k.add([
-    k.sprite("cup_full"),
-    k.pos(W - 56, H - 56), k.anchor("center"), k.scale(4), k.z(5),
+    k.text("ARCHIE", { size: 13 }),
+    k.pos(archieX, H - 10), k.anchor("center"),
+    k.color(160, 180, 220), k.opacity(0.8), k.z(10),
   ]);
 
-  // Menu items — glow on hover with sine pulse
-  const menuItems = [
-    { label: "(1) START GAME", key: "1" },
-    { label: "(2) OPTIONS",    key: "2" },
+  // ── BLUEPRINT — right side, floating gently ──────────────────────────────
+  const BPSC = 9;
+  const bpX = W - 110;
+  const bpBaseY = H - 28 - 64;
+  const blueprint = k.add([
+    k.sprite("blueprint"), k.pos(bpX, bpBaseY),
+    k.anchor("center"), k.scale(BPSC), k.z(8),
+  ]);
+  blueprint.onUpdate(() => {
+    blueprint.pos.y = bpBaseY + Math.sin(k.time() * 2.2) * 8;
+    // Gentle sway via scale (no rotate component added, so we can't tilt)
+    const sway = Math.sin(k.time() * 1.4) * 0.03;
+    blueprint.scale = k.vec2(BPSC * (1 + sway), BPSC * (1 - sway * 0.5));
+  });
+  k.add([
+    k.text("BLUEPRINT", { size: 13 }),
+    k.pos(bpX, H - 10), k.anchor("center"),
+    k.color(120, 180, 255), k.opacity(0.8), k.z(10),
+  ]);
+
+  // ── Decorative weapons row — centre bottom ────────────────────────────────
+  const weapons = [
+    { name: "hammer", color: k.rgb(210, 140, 60) },
+    { name: "wand",   color: k.rgb(120, 200, 255) },
+    { name: "bean",   color: k.rgb(200, 160, 80)  },
   ];
-  const startY = 460;
-  const texts = menuItems.map((item, i) => {
-    const t = k.add([
-      k.text(item.label, { size: 28 }),
-      k.pos(W / 2, startY + i * 70), k.anchor("center"),
-      k.color(90, 160, 200), k.outline(2, k.rgb(0, 0, 0)), k.opacity(1),
+  weapons.forEach((w, i) => {
+    const wx = W / 2 - 60 + i * 60;
+    const wBaseY = H - 28 - 28;
+    const ws = k.add([
+      k.sprite(w.name), k.pos(wx, wBaseY),
+      k.anchor("center"), k.scale(5), k.color(w.color.r, w.color.g, w.color.b), k.z(7),
     ]);
-    return t;
+    ws.onUpdate(() => {
+      ws.pos.y = wBaseY + Math.sin(k.time() * 2.5 + i * 1.2) * 5;
+    });
   });
 
-  // Pulse animation for both options
-  texts.forEach((t, i) => {
-    t.onUpdate(() => {
-      t.opacity = 0.7 + Math.sin(k.time() * 3 + i * 1.5) * 0.3;
-    });
+  // ── Menu items ───────────────────────────────────────────────────────────
+  const startY = 440;
+  const menuDefs = [
+    { label: "(1)  START GAME", col: k.rgb(80, 220, 120) },
+    { label: "(2)  OPTIONS",    col: k.rgb(90,  160, 200) },
+  ];
+  const menuTexts = menuDefs.map((m, i) => {
+    return k.add([
+      k.text(m.label, { size: 28 }),
+      k.pos(W / 2, startY + i * 62), k.anchor("center"),
+      k.color(m.col.r, m.col.g, m.col.b), k.outline(2, k.rgb(0, 0, 0)),
+      k.opacity(1), k.z(12),
+    ]);
+  });
+  menuTexts.forEach((t, i) => {
+    t.onUpdate(() => { t.opacity = 0.72 + Math.sin(k.time() * 3.2 + i * 1.8) * 0.28; });
   });
 
   k.onKeyPress("1", () => {
@@ -6685,71 +6749,131 @@ k.scene("title", () => {
 
 // =============================================================================
 // ARCH-401: OPTIONS SCREEN — Easy vs Super Archie difficulty selection.
+// Two-column layout: sprite art left/right, stat text in the middle.
 // =============================================================================
 k.scene("options", () => {
   const W = k.width(), H = k.height();
-  k.add([k.rect(W, H), k.pos(0, 0), k.color(6, 4, 14)]);
+  k.add([k.rect(W, H), k.pos(0, 0), k.color(6, 4, 18)]);
   for (let y = 0; y < H; y += 4)
     k.add([k.rect(W, 1), k.pos(0, y), k.color(255, 255, 255), k.opacity(0.04)]);
 
-  k.add([
-    k.text("SELECT DIFFICULTY", { size: 36 }),
-    k.pos(W / 2, 80), k.anchor("center"),
-    k.color(200, 200, 230), k.outline(3, k.rgb(0, 0, 0)),
-  ]);
+  // Thin accent line under header
+  k.add([k.text("SELECT DIFFICULTY", { size: 34 }),
+    k.pos(W / 2, 46), k.anchor("center"),
+    k.color(200, 200, 230), k.outline(3, k.rgb(0, 0, 0)), k.z(10)]);
+  k.add([k.rect(W - 80, 2), k.pos(40, 76), k.color(70, 60, 100), k.opacity(0.8)]);
 
-  // ── EASY ──────────────────────────────────────────────────────────────────
-  k.add([
-    k.text("(1)  EASY", { size: 32 }),
-    k.pos(W / 2, 200), k.anchor("center"),
-    k.color(80, 220, 120), k.outline(2, k.rgb(0, 0, 0)),
-  ]);
-  k.add([
-    k.text(
-      "Standard experience.\n" +
-      "5 coffee cups  •  normal enemy speed\n" +
-      "Regular damage & spawn rate\n" +
-      "Full item drops",
-      { size: 16, align: "center", width: 640 },
-    ),
-    k.pos(W / 2, 272), k.anchor("center"),
-    k.color(160, 220, 170),
-  ]);
+  // Vertical divider between the two columns
+  k.add([k.rect(2, H - 120), k.pos(W / 2, 86), k.color(60, 50, 90), k.opacity(0.8)]);
 
-  // ── SUPER ARCHIE ──────────────────────────────────────────────────────────
-  k.add([
-    k.text("(2)  SUPER ARCHIE", { size: 32 }),
-    k.pos(W / 2, 370), k.anchor("center"),
-    k.color(230, 80, 80), k.outline(2, k.rgb(0, 0, 0)),
-  ]);
-  k.add([
-    k.text(
-      "Maximum corporate suffering.\n" +
-      "½ coffee cups  •  enemies move 50% faster\n" +
-      "Enemies take 2× hits to destroy\n" +
-      "50% more enemies  •  50% fewer pickups",
-      { size: 16, align: "center", width: 640 },
-    ),
-    k.pos(W / 2, 448), k.anchor("center"),
-    k.color(230, 160, 160),
-  ]);
+  // ── LEFT COLUMN: EASY ─────────────────────────────────────────────────────
+  const LX = W / 4;   // centre of left column (200px)
 
-  // Footer
-  const back = k.add([
-    k.text("ESC / BACKSPACE — Back", { size: 14 }),
-    k.pos(W / 2, H - 30), k.anchor("center"),
-    k.color(100, 100, 120), k.opacity(0.7),
+  // Archie sprite — idle breathing
+  const eArchie = k.add([
+    k.sprite("archie"), k.pos(LX, 200),
+    k.anchor("center"), k.scale(10), k.z(8),
   ]);
-
-  k.onKeyPress("1", () => {
-    difficulty = "easy";
-    k.go("briefing", { idx: 0, score: 0 });
+  eArchie.onUpdate(() => {
+    const b = Math.sin(k.time() * 2.1) * 0.018;
+    eArchie.scale = k.vec2(10 * (1 - b), 10 * (1 + b));
   });
-  k.onKeyPress("2", () => {
-    difficulty = "super";
-    k.go("briefing", { idx: 0, score: 0 });
+  k.add([k.text("ARCHIE", { size: 11 }),
+    k.pos(LX, 248), k.anchor("center"), k.color(160, 220, 170), k.z(10)]);
+
+  // Blueprint floating beside Archie
+  const eBp = k.add([
+    k.sprite("blueprint"), k.pos(LX + 66, 188),
+    k.anchor("center"), k.scale(5.5), k.z(7),
+  ]);
+  eBp.onUpdate(() => { eBp.pos.y = 188 + Math.sin(k.time() * 2.4) * 6; });
+  k.add([k.text("BLUEPRINT", { size: 10 }),
+    k.pos(LX + 66, 216), k.anchor("center"), k.color(120, 180, 255), k.z(10)]);
+
+  // Cup icon — 5 cups = full health
+  for (let i = 0; i < 5; i++) {
+    k.add([k.sprite("cup_full"),
+      k.pos(LX - 48 + i * 22, 276),
+      k.anchor("center"), k.scale(2.8), k.z(8)]);
+  }
+
+  // Easy title & stats
+  k.add([k.text("(1)  EASY", { size: 28 }),
+    k.pos(LX, 316), k.anchor("center"),
+    k.color(80, 220, 120), k.outline(2, k.rgb(0, 0, 0)), k.z(10)]);
+  k.add([k.text(
+    "5 coffee cups\nNormal enemy speed\nNormal enemy HP\nNormal enemy count\nFull item drops",
+    { size: 14, align: "center", width: 220 }),
+    k.pos(LX, 390), k.anchor("center"),
+    k.color(160, 220, 170), k.z(10)]);
+
+  // ── RIGHT COLUMN: SUPER ARCHIE ────────────────────────────────────────────
+  const RX = W * 3 / 4;  // centre of right column (600px)
+
+  // Archie sprite — red-tinted, scale pulsing (danger feel)
+  const sArchie = k.add([
+    k.sprite("archie"), k.pos(RX, 200),
+    k.anchor("center"), k.scale(10), k.color(255, 100, 100), k.z(8),
+  ]);
+  let sRunT = 0;
+  let sCurFrame = "archie";
+  sArchie.onUpdate(() => {
+    sRunT += k.dt();
+    const frame = Math.floor(sRunT * 10) % 2 === 0 ? "archie_run_a" : "archie_run_b";
+    const b = Math.sin(sRunT * 18) * 0.08;
+    sArchie.scale = k.vec2(10 * (1 - b * 0.5), 10 * (1 + b));
+    if (frame !== sCurFrame) {
+      const asset = k.getSprite(frame);
+      if (asset && (asset as any).loaded !== false) {
+        sArchie.use(k.sprite(frame));
+        sCurFrame = frame;
+      }
+    }
   });
-  k.onKeyPress("escape", () => k.go("title"));
+  k.add([k.text("SUPER ARCHIE", { size: 11 }),
+    k.pos(RX, 248), k.anchor("center"), k.color(255, 140, 140), k.z(10)]);
+
+  // Hammer beside — symbol of punishment
+  const hammer = k.add([
+    k.sprite("hammer"), k.pos(RX + 64, 192),
+    k.anchor("center"), k.scale(5.5), k.color(210, 100, 60), k.z(7),
+  ]);
+  hammer.onUpdate(() => { hammer.pos.y = 192 + Math.sin(k.time() * 2.8 + 1) * 7; });
+  k.add([k.text("HAMMER", { size: 10 }),
+    k.pos(RX + 64, 218), k.anchor("center"), k.color(210, 120, 80), k.z(10)]);
+
+  // Cup row — only 2.5 cups (show 2 full, 1 half-faded)
+  for (let i = 0; i < 5; i++) {
+    k.add([k.sprite("cup_full"),
+      k.pos(RX - 48 + i * 22, 276),
+      k.anchor("center"), k.scale(2.8),
+      k.color(i < 2 ? 255 : 100, i < 2 ? 255 : 100, i < 2 ? 255 : 100),
+      k.opacity(i < 3 ? 1.0 : 0.18),
+      k.z(8)]);
+  }
+  // Red "½" label over the partial cup
+  k.add([k.text("½", { size: 12 }),
+    k.pos(RX - 48 + 2 * 22, 264), k.anchor("center"),
+    k.color(255, 80, 80), k.opacity(0.9), k.z(10)]);
+
+  // Super title & stats
+  k.add([k.text("(2)  SUPER ARCHIE", { size: 22 }),
+    k.pos(RX, 316), k.anchor("center"),
+    k.color(230, 80, 80), k.outline(2, k.rgb(0, 0, 0)), k.z(10)]);
+  k.add([k.text(
+    "½ coffee cups\nEnemies 50% faster\nEnemies take 2× hits\n50% more enemies\n50% fewer pickups",
+    { size: 14, align: "center", width: 220 }),
+    k.pos(RX, 390), k.anchor("center"),
+    k.color(230, 160, 160), k.z(10)]);
+
+  // ── Footer ────────────────────────────────────────────────────────────────
+  k.add([k.text("ESC / BACKSPACE — Back to title", { size: 13 }),
+    k.pos(W / 2, H - 22), k.anchor("center"),
+    k.color(100, 100, 130), k.opacity(0.7), k.z(10)]);
+
+  k.onKeyPress("1", () => { difficulty = "easy";  k.go("briefing", { idx: 0, score: 0 }); });
+  k.onKeyPress("2", () => { difficulty = "super"; k.go("briefing", { idx: 0, score: 0 }); });
+  k.onKeyPress("escape",    () => k.go("title"));
   k.onKeyPress("backspace", () => k.go("title"));
 });
 
