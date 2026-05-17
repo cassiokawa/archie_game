@@ -226,6 +226,66 @@ export const archie_damage = wrapSVG(`
   <rect x="11" y="15" width="4" height="1" fill="#000"/>
 `);
 
+// =============================================================================
+// BOSS-102: THE CONTRADICTORY REQUEST GOLEM — Layer 1 mid-level miniboss.
+// =============================================================================
+
+// GOLEM SHELL — chunky orange-yellow bureaucratic golem made of stacked post-its.
+export const golem_shell = wrapSVG(`
+  <!-- Body: stacked docs/post-its -->
+  <rect x="2" y="2" width="12" height="12" fill="#E67E22"/>
+  <rect x="3" y="3" width="10" height="10" fill="#F39C12"/>
+  <!-- Horizontal "requirements lines" on body -->
+  <rect x="3" y="6" width="10" height="1" fill="#D35400"/>
+  <rect x="3" y="9" width="10" height="1" fill="#D35400"/>
+  <!-- Angry red eyes -->
+  <rect x="4" y="4" width="2" height="2" fill="#C0392B"/>
+  <rect x="10" y="4" width="2" height="2" fill="#C0392B"/>
+  <!-- Eye pupils -->
+  <rect x="5" y="4" width="1" height="1" fill="#000"/>
+  <rect x="11" y="4" width="1" height="1" fill="#000"/>
+  <!-- Confused frown mouth -->
+  <rect x="5" y="11" width="6" height="1" fill="#D35400"/>
+  <rect x="5" y="12" width="1" height="1" fill="#D35400"/>
+  <rect x="10" y="12" width="1" height="1" fill="#D35400"/>
+  <!-- Short arms -->
+  <rect x="0" y="5" width="2" height="5" fill="#E67E22"/>
+  <rect x="14" y="5" width="2" height="5" fill="#E67E22"/>
+  <!-- Feet -->
+  <rect x="3" y="14" width="4" height="2" fill="#D35400"/>
+  <rect x="9" y="14" width="4" height="2" fill="#D35400"/>
+  <!-- Inner core hint (yellow) -->
+  <rect x="6" y="7" width="4" height="2" fill="#F1C40F"/>
+`);
+
+// GOLEM CORE — same silhouette but shell cracked open (dark brown), bright orange-red core blazing.
+export const golem_core = wrapSVG(`
+  <!-- Cracked outer shell (dark) -->
+  <rect x="2" y="2" width="12" height="12" fill="#784212"/>
+  <rect x="3" y="3" width="10" height="10" fill="#A04000"/>
+  <!-- Crack lines -->
+  <rect x="7" y="3" width="1" height="3" fill="#2C3E50"/>
+  <rect x="5" y="7" width="6" height="1" fill="#2C3E50"/>
+  <rect x="11" y="8" width="1" height="4" fill="#2C3E50"/>
+  <!-- Glowing core: orange to yellow to white hot -->
+  <rect x="5" y="5" width="6" height="6" fill="#E74C3C"/>
+  <rect x="6" y="6" width="4" height="4" fill="#FF8C00"/>
+  <rect x="7" y="7" width="2" height="2" fill="#FFFF00"/>
+  <!-- Shocked X eyes -->
+  <rect x="4" y="4" width="1" height="1" fill="#000"/>
+  <rect x="6" y="4" width="1" height="1" fill="#000"/>
+  <rect x="5" y="5" width="1" height="1" fill="#000"/>
+  <rect x="9" y="4" width="1" height="1" fill="#000"/>
+  <rect x="11" y="4" width="1" height="1" fill="#000"/>
+  <rect x="10" y="5" width="1" height="1" fill="#000"/>
+  <!-- Drooping arms -->
+  <rect x="0" y="7" width="2" height="5" fill="#784212"/>
+  <rect x="14" y="7" width="2" height="5" fill="#784212"/>
+  <!-- Feet (purple - confused) -->
+  <rect x="3" y="14" width="4" height="2" fill="#7D3C98"/>
+  <rect x="9" y="14" width="4" height="2" fill="#7D3C98"/>
+`);
+
 // SCOPE CREEP — green amorphous blob.
 export const scope_creep = wrapSVG(`
   <rect x="3" y="6" width="10" height="10" fill="#229954"/>

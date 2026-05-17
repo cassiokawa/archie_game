@@ -16,6 +16,7 @@ import {
   boss_cthulhu_idle, boss_cthulhu_stun, projectile_ticket,
   boss_kafka_roach, boss_ooze_large, boss_ooze_medium,
   projectile_sync, hazard_data_block, hazard_data_wave,
+  golem_shell, golem_core,
 } from "./sprites";
 
 const k = kaboom({
@@ -2416,6 +2417,8 @@ k.loadSprite("boss_ooze_medium", boss_ooze_medium);
 k.loadSprite("projectile_sync", projectile_sync);
 k.loadSprite("hazard_data_block", hazard_data_block);
 k.loadSprite("hazard_data_wave", hazard_data_wave);
+k.loadSprite("golem_shell", golem_shell);
+k.loadSprite("golem_core",  golem_core);
 
 k.scene("level", (data: { idx: number; score: number }) => {
   const idx = data.idx;
@@ -2440,6 +2443,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
   let ghostTimer = 0;
   let bossPhase = false;
   let bossDefeated = false;
+  let golemSpawned = false;
   let awsSpiderSpawned = false;
   let kafkaRoachSpawned = false;
   // ARCH-253: Layer-4 specific state. `cloudZoneTouchT` is the last time
@@ -5169,6 +5173,389 @@ k.scene("level", (data: { idx: number; score: number }) => {
     });
   }
 
+  // BOSS-102: Layer 1 mid-level miniboss — The Contradictory Request Golem.
+  // Three phases: chase/stomp/barrage (shell HP) → vulnerable (core HP 3).
+  // Shield deflects barrage tickets back; deflected hit = 2 shell damage.
+  // Only the Whack attack (X key) damages the core in vulnerable phase.
+  function spawnGolem() {
+    const SHELL_HP = 10;
+    const CORE_HP  = 3;
+    const TOTAL_HP = SHELL_HP + CORE_HP; // k.health tracks combined pool
+    const GOLEM_Y  = GROUND_Y - 58;
+
+    let shellHp = SHELL_HP;
+    let coreHp  = CORE_HP;
+    // gs = golem state; actionLocked prevents re-entry during async attacks
+    let gs: "chase" | "stomp" | "barrage" | "vulnerable" = "chase";
+    let actionTimer   = 0;
+    let actionLocked  = false;
+    let vulnerableUntil = 0;
+    let deflectHandle: any = null;
+
+    // ── Flavour text pools ───────────────────────────────────────────────────
+    const CHASE_QUIPS = [
+      "HAVE YOU READ THE 400-PAGE SPEC?", "REQUIREMENTS UPDATED v47!",
+      "SCOPE APPROVED BY ALL STAKEHOLDERS", "CHANGE REQUEST #∞",
+      "ADDING JUST ONE MORE FEATURE", "DEFINITION OF DONE: UNDEFINED",
+      "THIS IS ON THE ROADMAP (NEXT QUARTER)", "CUSTOMER SAYS DO EVERYTHING",
+      "MVP MEANS MAXIMUM VIABLE PAIN", "SYNERGIZING YOUR DESTRUCTION",
+      "STAKEHOLDER ALIGNMENT ACHIEVED", "VELOCITY: 0 (METRICS LOOK GREAT!)",
+      "BLOCKING YOUR SPRINT!", "STORY POINTS: INFINITY",
+      "LET'S CIRCLE BACK ON ARCHIE", "FEATURE: ARCHIE ELIMINATION",
+      "GROOMING THIS ENCOUNTER", "PRIORITY: CRUSH ARCHIE (P0)",
+    ];
+    const STOMP_QUIPS = [
+      "DELIVERABLE DEPLOYED!", "CRUSHING THE COMPETITION (YOU)",
+      "STRATEGIC ALIGNMENT ACHIEVED!", "MILESTONE: ARCHIE SQUISHED",
+      "GROUND-BREAKING FEATURE SHIPPED!", "IMPACT ASSESSMENT: MAXIMUM",
+      "SHIPPING EARLY — QUALITY OPTIONAL!", "DISRUPTING YOUR HEALTH BAR",
+      "SPRINT GOAL: DELETE ARCHIE",
+    ];
+    const BARRAGE_QUIPS = [
+      "JIRA TICKET STORM!", "BACKLOG DUMP — ALL PRIORITY P0!",
+      "CHANGE REQUEST DELUGE!", "FEATURE REQUIREMENTS: INCOMING!",
+      "SPRINT PLANNING ATTACK!", "USER STORIES: UNLIMITED EDITION",
+      "THE BACKLOG IS SENTIENT!", "ACCEPTANCE CRITERIA: IMPOSSIBLE",
+      "GROOMING SESSION: COMBAT EDITION",
+    ];
+    const DEFLECT_QUIPS = [
+      "REQUIREMENTS RETURNED!", "FEEDBACK LOOP ACTIVATED!",
+      "USER ACCEPTANCE TESTING FAILED!", "CHANGE REQUEST: REJECTED",
+      "SPEC AMENDED BY ARCHIE!", "STAKEHOLDER PUSHBACK!",
+      "THAT TICKET IS NOW YOURS!", "SCOPE REDUCTION INCOMING!",
+    ];
+    const DEATH_QUIPS = [
+      "REQUIREMENTS: DEPRECATED!", "PRODUCT DEFINITION: NULL",
+      "BACKLOG CLEARED!", "SCOPE REDUCED TO ZERO",
+      "DEFINITION OF DONE: DONE!", "JIRA CLOSED: WON'T FIX (ARCHIE WINS)",
+      "SPRINT RETROSPECTIVE: OUCH",
+    ];
+
+    const rnd = (arr: string[]) => arr[Math.floor(k.rand(0, arr.length))];
+
+    // ── Spawn the golem entity ───────────────────────────────────────────────
+    const gx = Math.min(LW - 700, archie.pos.x + 400);
+    const golem = k.add([
+      k.sprite("golem_shell"),
+      k.pos(gx, GOLEM_Y),
+      k.area({ scale: 0.82 }),
+      k.anchor("center"),
+      k.scale(SCALE * 2.2),
+      k.z(8),
+      k.health(TOTAL_HP),
+      k.color(255, 255, 255),
+      "golem", "miniboss",
+      { maxHp: TOTAL_HP, needsHammer: false },
+    ]);
+    bossRef = golem;
+
+    // ── HP helpers ───────────────────────────────────────────────────────────
+    function hurtShell(dmg: number) {
+      if (gs === "vulnerable") {
+        popup(golem.pos, "USE WHACK! (X)", [255, 200, 50]);
+        return;
+      }
+      shellHp = Math.max(0, shellHp - dmg);
+      golem.hurt(dmg);
+      // Hit flash
+      k.add([
+        k.circle(22), k.pos(golem.pos), k.anchor("center"),
+        k.color(255, 200, 50), k.opacity(0.8), k.z(22),
+        k.lifespan(0.10, { fade: 0.08 }),
+      ]);
+      popup(golem.pos, `-${dmg} SHELL`, [255, 200, 50]);
+      k.shake(2);
+      if (shellHp <= 0) enterGs("vulnerable");
+    }
+
+    function hurtCore(dmg: number) {
+      if (gs !== "vulnerable") return;
+      coreHp = Math.max(0, coreHp - dmg);
+      golem.hurt(dmg);
+      k.shake(5);
+      k.add([
+        k.circle(28), k.pos(golem.pos), k.anchor("center"),
+        k.color(255, 80, 80), k.opacity(0.9), k.z(22),
+        k.lifespan(0.12, { fade: 0.10 }),
+      ]);
+      if (coreHp <= 0) {
+        // Core destroyed — sync Kaboom HP to 0 and die
+        golem.hurt(golem.hp());
+      } else {
+        popup(golem.pos, `CORE HIT! (${coreHp} LEFT)`, [100, 255, 100]);
+      }
+    }
+
+    // ── State machine ────────────────────────────────────────────────────────
+    function enterGs(newState: typeof gs) {
+      gs = newState;
+      actionTimer = 0;
+      if (newState === "vulnerable") {
+        vulnerableUntil = k.time() + 4.2;
+        // Sync Kaboom HP to exactly CORE_HP so bar shows remaining core
+        const cur = golem.hp();
+        if (cur > CORE_HP) golem.hurt(cur - CORE_HP);
+        else if (cur < CORE_HP) golem.heal(CORE_HP - cur);
+        golem.use(k.sprite("golem_core"));
+        popup(golem.pos, "SHELL CRACKED — WHACK THE CORE! (X)", [100, 255, 100]);
+        k.add([
+          k.fixed(), k.text("!! CORE EXPOSED — USE WHACK (X) !!", { size: 18 }),
+          k.pos(k.width() / 2, 200), k.anchor("center"),
+          k.color(100, 255, 100), k.outline(3, k.rgb(16, 16, 24)), k.z(90),
+          k.lifespan(2.6, { fade: 0.8 }),
+        ]);
+      } else if (newState === "chase") {
+        golem.use(k.sprite("golem_shell"));
+        golem.color = k.rgb(255, 255, 255);
+        actionLocked = false;
+      }
+    }
+
+    // ── Async attack: STOMP ──────────────────────────────────────────────────
+    async function doStomp() {
+      if (!golem.exists()) return;
+      actionLocked = true;
+      popup(golem.pos.add(k.vec2(0, -72)), rnd(STOMP_QUIPS), [255, 200, 60]);
+
+      // Telegraph: red tint + horizontal judder
+      golem.color = k.rgb(255, 80, 80);
+      for (let i = 0; i < 4; i++) {
+        if (!golem.exists()) return;
+        golem.pos.x += k.rand(-12, 12);
+        await k.wait(0.065);
+      }
+
+      // Float above Archie
+      const targetX = Math.max(80, Math.min(bossGateX - 80, archie.pos.x));
+      await k.tween(golem.pos.x, targetX, 0.28,
+        (v) => { if (golem.exists()) golem.pos.x = v; }, k.easings.easeInOutSine);
+      await k.tween(golem.pos.y, 65, 0.18,
+        (v) => { if (golem.exists()) golem.pos.y = v; }, k.easings.easeOutCubic);
+      if (!golem.exists()) return;
+
+      // Slam down
+      await k.tween(golem.pos.y, GOLEM_Y, 0.10,
+        (v) => { if (golem.exists()) golem.pos.y = v; }, k.easings.easeInQuad);
+      if (!golem.exists()) return;
+
+      // Impact
+      k.shake(9);
+      const AOE_R = 140;
+      k.add([
+        k.circle(AOE_R), k.pos(golem.pos), k.anchor("center"),
+        k.color(255, 140, 30), k.opacity(0.55), k.z(15),
+        k.lifespan(0.35, { fade: 0.28 }),
+      ]);
+      k.add([
+        k.circle(AOE_R * 0.5), k.pos(golem.pos), k.anchor("center"),
+        k.color(255, 230, 60), k.opacity(0.72), k.z(16),
+        k.lifespan(0.20, { fade: 0.15 }),
+      ]);
+      if (golem.pos.dist(archie.pos) < AOE_R) damageArchie(1);
+
+      // Debris sparks
+      for (let i = 0; i < 7; i++) {
+        const ang = (i / 7) * Math.PI * 2 + k.rand(-0.3, 0.3);
+        k.add([
+          k.rect(4, 4), k.pos(golem.pos), k.anchor("center"),
+          k.color(255, 160, 40), k.opacity(0.9), k.z(18),
+          k.move(k.vec2(Math.cos(ang), Math.sin(ang)), k.rand(120, 260)),
+          k.lifespan(0.35, { fade: 0.28 }),
+        ]);
+      }
+
+      golem.color = k.rgb(255, 255, 255);
+      await k.wait(0.75);
+      if (golem.exists()) enterGs("chase");
+    }
+
+    // ── Async attack: BARRAGE ────────────────────────────────────────────────
+    async function doBarrage() {
+      if (!golem.exists()) return;
+      actionLocked = true;
+      popup(golem.pos.add(k.vec2(0, -72)), rnd(BARRAGE_QUIPS), [255, 180, 50]);
+
+      const COUNT = 5;
+      for (let i = 0; i < COUNT; i++) {
+        await k.wait(0.13);
+        if (!golem.exists()) return;
+
+        // Fan toward Archie: spread ±2 * 0.22 rad
+        const toArchie = archie.pos.sub(golem.pos).unit();
+        const spreadAngle = (i - (COUNT - 1) / 2) * 0.22;
+        const cos = Math.cos(spreadAngle), sin = Math.sin(spreadAngle);
+        const dir = k.vec2(
+          toArchie.x * cos - toArchie.y * sin,
+          toArchie.x * sin + toArchie.y * cos
+        );
+        const spd = k.rand(220, 370);
+        const zigAmp  = k.rand(25, 80);
+        const zigFreq = k.rand(4, 9);
+        let tAge = 0;
+        // Store velocity on the entity for deflect/gravity
+        const tvx = dir.x * spd;
+        let   tvy = dir.y * spd;
+
+        const ticket = k.add([
+          k.sprite("ticket"),
+          k.pos(golem.pos.x + dir.x * 36, golem.pos.y),
+          k.area({ scale: 0.75 }),
+          k.anchor("center"),
+          k.scale(2.3),
+          k.color(255, 255, 255),
+          k.z(9),
+          k.lifespan(4.5, { fade: 0.4 }),
+          "hazard", "ticket", "golemTicket",
+          { tvx, tvy, deflected: false },
+        ]);
+
+        ticket.onUpdate(() => {
+          if (!ticket.exists()) return;
+          tAge += k.dt();
+          if (!ticket.deflected) {
+            // Zig-zag homing on Archie
+            const gf = Math.min(1, ticket.pos.y / GROUND_Y);
+            const osc = zigAmp * Math.sin(zigFreq * tAge) * (1 - gf * 0.5);
+            const wantX = archie.pos.x + osc;
+            ticket.pos.x += (wantX - ticket.pos.x) * Math.min(1, 4.5 * k.dt());
+            ticket.tvy += 160 * k.dt(); // gravity
+            ticket.pos.y += ticket.tvy * k.dt();
+          } else {
+            // Deflected: fly straight at golem
+            ticket.pos.x += ticket.tvx * k.dt();
+            ticket.pos.y += ticket.tvy * k.dt();
+          }
+          if (ticket.pos.y > GROUND_Y + 60) k.destroy(ticket);
+        });
+
+        // Deflected tickets that reach golem deal shell damage
+        ticket.onCollide("golem", () => {
+          if (!ticket.deflected || !golem.exists()) return;
+          k.destroy(ticket);
+          popup(golem.pos, rnd(DEFLECT_QUIPS), [100, 255, 100]);
+          k.shake(4);
+          k.addKaboom(golem.pos, { scale: 0.45 });
+          hurtShell(2);
+        });
+      }
+
+      await k.wait(0.9);
+      if (golem.exists()) enterGs("chase");
+    }
+
+    // ── onUpdate: chase logic + vulnerable pulse/expiry ──────────────────────
+    golem.onUpdate(() => {
+      if (!golem.exists()) return;
+      actionTimer += k.dt();
+
+      if (gs === "chase") {
+        const dx = archie.pos.x - golem.pos.x;
+        golem.pos.x += Math.sign(dx) * Math.min(Math.abs(dx), 88 * k.dt());
+        golem.flipX = dx < 0;
+        golem.pos.x = Math.max(80, Math.min(bossGateX - 80, golem.pos.x));
+        golem.pos.y = GOLEM_Y;
+
+        // Occasional taunt quips while chasing
+        if (!actionLocked && actionTimer > k.rand(3.0, 5.0)) {
+          actionTimer = 0;
+          if (k.rand() < 0.35) popup(golem.pos.add(k.vec2(0, -65)), rnd(CHASE_QUIPS), [255, 220, 70]);
+          if (k.rand() < 0.5) doStomp(); else doBarrage();
+        }
+      } else if (gs === "vulnerable") {
+        // Pulse color: red→orange→yellow
+        const p = (Math.sin(k.time() * 9) + 1) / 2;
+        golem.color = k.rgb(255, Math.round(60 + p * 130), Math.round(30 + p * 60));
+        if (k.time() > vulnerableUntil) {
+          // Shell reforms at half HP
+          shellHp = Math.ceil(SHELL_HP / 2);
+          const cur = golem.hp();
+          const target = shellHp + coreHp;
+          if (cur < target) golem.heal(target - cur);
+          popup(golem.pos, "SHELL REFORMED! REQUIREMENTS v2 LOADED!", [255, 200, 50]);
+          enterGs("chase");
+        }
+      }
+    });
+
+    // ── Shield deflect: golemTicket + shielding → reverse toward golem ───────
+    deflectHandle = archie.onCollide("golemTicket", (t: any) => {
+      if (!t.exists() || t.deflected) return;
+      if (!shielding || !golem.exists()) return;
+      t.deflected = true;
+      const toGolem = golem.pos.sub(t.pos).unit();
+      t.tvx = toGolem.x * 500;
+      t.tvy = toGolem.y * 500;
+      t.color = k.rgb(100, 255, 100);
+      popup(t.pos, "DEFLECTED!", [100, 255, 100]);
+      k.add([
+        k.circle(18), k.pos(t.pos), k.anchor("center"),
+        k.color(100, 255, 100), k.opacity(0.75), k.z(20),
+        k.lifespan(0.14, { fade: 0.12 }),
+      ]);
+    });
+
+    // ── Weapon hits (blueprint/hammer/wand) → shell damage only ─────────────
+    k.onCollide("weapon", "golem", (w: any, g: any) => {
+      if (!g.exists() || !w.exists()) return;
+      if (w.hits?.has(g.id)) return;
+      w.hits?.add(g.id);
+      if (gs === "vulnerable") { popup(g.pos, "USE WHACK! (X)", [255, 200, 50]); return; }
+      const dmg = Math.max(1, Math.round(w.weaponDmg * archie.dmgMult()));
+      hurtShell(dmg);
+      if (w.is("projectile")) k.destroy(w);
+    });
+
+    // ── Whack hitbox → shell (normal) or core (vulnerable) ──────────────────
+    k.onCollide("whack_hitbox", "golem", (_h: any, g: any) => {
+      if (!g.exists()) return;
+      if (gs === "vulnerable") {
+        hurtCore(1);
+        popup(g.pos, "CORE WHACKED!", [100, 255, 100]);
+        k.addKaboom(g.pos, { scale: 0.5 });
+      } else {
+        const dmg = Math.max(1, Math.round(WEAPONS[0].dmg * archie.dmgMult() * 1.5));
+        hurtShell(dmg);
+        popup(g.pos, `WHACK! -${dmg}`, [85, 193, 233]);
+      }
+    });
+
+    // ── Contact damage to Archie (rate-limited) ──────────────────────────────
+    let lastContactT = -5;
+    archie.onCollide("golem", () => {
+      if (shielding) return;
+      if (k.time() - lastContactT < 1.3) return;
+      lastContactT = k.time();
+      damageArchie(1);
+      popup(archie.pos.add(k.vec2(0, -32)), rnd(CHASE_QUIPS), [255, 200, 60]);
+    });
+
+    // ── Death ────────────────────────────────────────────────────────────────
+    golem.onDeath(() => {
+      if (deflectHandle) deflectHandle.cancel();
+      bossRef = null;
+      killReward(golem, 800);
+      popup(golem.pos, rnd(DEATH_QUIPS), [150, 255, 150]);
+      k.add([
+        k.fixed(),
+        k.text("CONTRADICTORY REQUEST GOLEM\nDEPRECATED!", { size: 18, align: "center" }),
+        k.pos(k.width() / 2, 190), k.anchor("center"),
+        k.color(100, 255, 120), k.outline(3, k.rgb(16, 16, 24)), k.z(90),
+        k.lifespan(3.4, { fade: 1 }),
+      ]);
+      k.addKaboom(golem.pos, { scale: 1.6 });
+    });
+
+    // ── Spawn fanfare ────────────────────────────────────────────────────────
+    k.add([
+      k.fixed(),
+      k.text("!! CONTRADICTORY REQUEST GOLEM !!\nREQUIREMENTS UNCLEAR", { size: 18, align: "center" }),
+      k.pos(k.width() / 2, 220), k.anchor("center"),
+      k.color(255, 200, 60), k.outline(3, k.rgb(16, 16, 24)), k.z(90),
+      k.lifespan(3.2, { fade: 0.8 }),
+    ]);
+    popup(golem.pos, "THE GOLEM IS HERE! DEFINE YOUR REQUIREMENTS!", [255, 200, 60]);
+  }
+
   function spawnCthulhuBoss() {
     const ARENA_LEFT  = bossGateX + 60;
     const ARENA_RIGHT = LW - 80;
@@ -6465,6 +6852,19 @@ k.scene("level", (data: { idx: number; score: number }) => {
       popup(k.camPos(), "P0: FELL OFF THE ROADMAP", [255, 80, 80]);
       archie.pos = k.vec2(targetX, 80);
       if (coffeeHalves <= 0) burnoutCrash();
+    }
+
+    // BOSS-102: Layer 1 — Contradictory Request Golem at ~40% of level width.
+    if (idx === 0 && !golemSpawned && !bossPhase && archie.pos.x > LW * 0.40) {
+      golemSpawned = true;
+      spawnGolem();
+      k.add([
+        k.fixed(),
+        k.text("!! THE CONTRADICTORY REQUEST GOLEM !!\nBACKLOG INCOMING", { size: 20, align: "center" }),
+        k.pos(k.width() / 2, 220), k.anchor("center"),
+        k.color(255, 200, 60), k.outline(3, k.rgb(16, 16, 24)), k.z(90),
+        k.lifespan(3.2, { fade: 0.8 }), k.opacity(1),
+      ]);
     }
 
     // ARCH-170: Layer 2 — the AWS Spider miniboss appears mid-level.
