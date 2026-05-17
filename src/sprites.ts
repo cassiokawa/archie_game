@@ -141,6 +141,38 @@ export const ground_tile = wrapSVG(`
   <rect x="14" y="0" width="2" height="16" fill="#D4AC0D"/>
 `);
 
+// CEO APPROVED SHIELD — crisp 8-bit heraldic shield. Golden yellow body,
+// dark-gold pixel border, left-edge highlight stripe, white tick (✓).
+// Replaces the blurry 72×72 canvas arc version (defSprite "armor").
+export const item_shield = wrapSVG(`
+  <!-- Dark gold border — top edge -->
+  <rect x="3" y="2" width="10" height="1" fill="#7A5500"/>
+  <!-- Left / right sides -->
+  <rect x="2" y="3" width="1" height="6" fill="#7A5500"/>
+  <rect x="13" y="3" width="1" height="6" fill="#7A5500"/>
+  <!-- Bottom taper border -->
+  <rect x="3" y="9"  width="10" height="1" fill="#7A5500"/>
+  <rect x="4" y="10" width="8"  height="1" fill="#7A5500"/>
+  <rect x="5" y="11" width="6"  height="1" fill="#7A5500"/>
+  <rect x="6" y="12" width="4"  height="1" fill="#7A5500"/>
+  <rect x="7" y="13" width="2"  height="1" fill="#7A5500"/>
+  <!-- Golden yellow fill -->
+  <rect x="3" y="3"  width="10" height="6" fill="#F1C40F"/>
+  <rect x="4" y="9"  width="8"  height="1" fill="#F1C40F"/>
+  <rect x="5" y="10" width="6"  height="1" fill="#F1C40F"/>
+  <rect x="6" y="11" width="4"  height="1" fill="#F1C40F"/>
+  <rect x="7" y="12" width="2"  height="1" fill="#F1C40F"/>
+  <!-- Left highlight stripe (two-tone shimmer) -->
+  <rect x="3" y="3" width="1" height="6" fill="#FFFAD4"/>
+  <rect x="4" y="3" width="1" height="3" fill="#FFF5A0"/>
+  <!-- White checkmark (✓) — right arm, junction, left arm -->
+  <rect x="11" y="4" width="1" height="1" fill="#FFF"/>
+  <rect x="10" y="5" width="1" height="1" fill="#FFF"/>
+  <rect x="9"  y="6" width="1" height="1" fill="#FFF"/>
+  <rect x="6"  y="7" width="3" height="1" fill="#FFF"/>
+  <rect x="4"  y="8" width="3" height="1" fill="#FFF"/>
+`);
+
 // COFFEE CUP — white mug with dark roast fill and steam wisps.
 export const coffee_cup = wrapSVG(`
   <rect x="3" y="6" width="10" height="8" fill="#ECF0F1"/>

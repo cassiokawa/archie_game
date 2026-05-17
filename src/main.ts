@@ -10,7 +10,7 @@ import {
   archie_idle, archie_run_a, archie_run_b, archie_jump_pose,
   archie_fall_pose, archie_drink_pose,
   scope_creep, weapon_blueprint, weapon_hammer, coffee_bean, ground_tile,
-  coffee_cup, weapon_wand, trap_misplacement,
+  coffee_cup, weapon_wand, trap_misplacement, item_shield,
 } from "./sprites";
 
 const k = kaboom({
@@ -1138,22 +1138,7 @@ defSprite("jira_scroll2", 60, 20, (c) => {
 });
 
 // ARCH-93: Stakeholder Support Armor — the CTO's blessing.
-defSprite("armor", 72, 72, (c) => {
-  c.fillStyle = "rgba(255,220,80,0.3)";
-  c.beginPath(); c.arc(36, 36, 34, 0, 7); c.fill();
-  c.fillStyle = vgrad(c, 0, 6, 62, "#ffe680", "#c89010");
-  c.beginPath();
-  c.moveTo(36, 6); c.lineTo(64, 16); c.lineTo(60, 44);
-  c.quadraticCurveTo(48, 64, 36, 68);
-  c.quadraticCurveTo(24, 64, 12, 44);
-  c.lineTo(8, 16); c.closePath();
-  c.lineWidth = 5; c.strokeStyle = "#7a5500"; c.fill(); c.stroke();
-  c.strokeStyle = "#fff7d0"; c.lineWidth = 6; c.lineCap = "round";
-  c.beginPath(); c.moveTo(24, 36); c.lineTo(33, 47); c.lineTo(50, 23); c.stroke();
-  c.lineCap = "butt";
-  c.fillStyle = "rgba(255,255,255,0.55)";
-  c.beginPath(); c.ellipse(24, 20, 6, 10, -0.4, 0, 7); c.fill();
-});
+// ASSET-1138: armor sprite retired — replaced by item_shield SVG loaded above.
 
 // ARCH-94: Double Espresso — speed boost + Cognitive Load locked at 100%.
 defSprite("espresso", 72, 60, (c) => {
@@ -2281,6 +2266,7 @@ k.loadSprite("cup_half", coffee_cup);   // same visual; state shown via opacity
 k.loadSprite("cup_empty", coffee_cup);
 k.loadSprite("wand", weapon_wand);
 k.loadSprite("misplacement", trap_misplacement);
+k.loadSprite("armor", item_shield); // override blurry canvas arc shield
 
 k.scene("level", (data: { idx: number; score: number }) => {
   const idx = data.idx;
