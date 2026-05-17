@@ -2932,24 +2932,111 @@ k.scene("level", (data: { idx: number; score: number }) => {
     // diagrams floating at parallax, and mixed-color ticket labels on the
     // floor. No skyline — DDD lives in the abstract.
     if (idx === 1) {
-      k.drawRect({ width: W, height: H, color: k.rgb(8, 18, 40) });
+      // ARCH-443: Layer 2 — "Solutions Architecture" backdrop.
+      // Dark navy void + triple-depth Matrix rain of glitching green code.
+      // Three depth bands create a parallax sense of distance:
+      //   Band 1  par=0.08  — far, tiny, ghostly (the void itself is digital)
+      //   Band 2  par=0.18  — mid, standard columns, bright heads + fade trails
+      //   Band 3  par=0.32  — near, sparse bright accents, occasional keywords
+      k.drawRect({ width: W, height: H, color: k.rgb(2, 8, 4) }); // near-black green-tint void
       drawSharedParallax(camX, W);
-      k.drawSprite({
-        sprite: "vortex",
-        pos: k.vec2(W / 2, H / 2),
-        anchor: "center",
-        scale: k.vec2(1),
-        angle: k.time() * 6,
-      });
-      // ARCH-309: cyan horizon glow + faint distant lights for atmospheric depth.
+
+      // Characters used in the rain — binary + hex + code punctuation
+      const RAIN_CHARS  = ["0","1","0","1","0","1","A","F","E","C","7","3",
+                           "{","}","<",">",";",":","=","/","\\","|","!","#","@","&"];
+      const RAIN_WORDS  = ["NULL","void","SLA","API","DDD","ADR","RFC","CQRS","REST","gRPC"];
+
+      // ── BAND 1: FAR RAIN (par 0.08) — ghostly, tiny, dense ──────────────
+      {
+        const par = 0.08, colSp = 13;
+        const offX = ((camX * par) % colSp + colSp) % colSp;
+        for (let x = -offX; x < W + colSp; x += colSp) {
+          const seed = Math.floor((x + camX * par) / colSp) & 0xFFFF;
+          const speed  = 28 + (seed * 17 & 0xFF) % 38;         // 28–66 px/s
+          const offset = (seed * 53 & 0xFF) * 2.8;             // stagger start
+          const head   = (k.time() * speed + offset) % (H + 120);
+          const TRAIL  = 9;
+          for (let i = 0; i < TRAIL; i++) {
+            const yy = head - i * 12;
+            if (yy < -14 || yy > H + 4) continue;
+            const ci = ((seed * 7) + i + Math.floor(k.time() * 3)) % RAIN_CHARS.length;
+            const brightness = i === 0 ? 210 : Math.max(30, 150 - i * 18);
+            k.drawText({
+              text: RAIN_CHARS[ci], size: 9,
+              pos: k.vec2(x, yy),
+              color: k.rgb(0, brightness, Math.floor(brightness * 0.18)),
+              opacity: i === 0 ? 0.22 : 0.10 * (1 - i / TRAIL),
+            });
+          }
+        }
+      }
+
+      // ── BAND 2: MID RAIN (par 0.18) — main Matrix columns ────────────────
+      {
+        const par = 0.18, colSp = 16;
+        const offX = ((camX * par) % colSp + colSp) % colSp;
+        for (let x = -offX; x < W + colSp; x += colSp) {
+          const seed = Math.floor((x + camX * par) / colSp) & 0xFFFF;
+          const speed  = 55 + (seed * 23 & 0xFF) % 80;         // 55–135 px/s
+          const offset = (seed * 61 & 0xFF) * 3.2;
+          const head   = (k.time() * speed + offset) % (H + 180);
+          const TRAIL  = 11;
+          for (let i = 0; i < TRAIL; i++) {
+            const yy = head - i * 14;
+            if (yy < -16 || yy > H + 4) continue;
+            // Occasional keyword burst on the column head
+            const useWord = i === 0 && (seed % 14 === 0);
+            const char = useWord
+              ? RAIN_WORDS[(seed * 3) % RAIN_WORDS.length][0]
+              : RAIN_CHARS[((seed * 11) + i + Math.floor(k.time() * 5)) % RAIN_CHARS.length];
+            // Head = near-white; trail fades from bright green → dark
+            const g = i === 0 ? 255 : Math.max(28, 210 - i * 20);
+            const r = i === 0 ? 180 : 0;
+            k.drawText({
+              text: char, size: 10,
+              pos: k.vec2(x, yy),
+              color: k.rgb(r, g, Math.floor(g * 0.15)),
+              opacity: i === 0 ? 0.80 : 0.28 * (1 - i / TRAIL),
+            });
+          }
+        }
+      }
+
+      // ── BAND 3: NEAR ACCENT RAIN (par 0.32) — sparse bright streaks ───────
+      {
+        const par = 0.32, colSp = 28;
+        const offX = ((camX * par) % colSp + colSp) % colSp;
+        for (let x = -offX; x < W + colSp; x += colSp) {
+          const seed = Math.floor((x + camX * par) / colSp) & 0xFFFF;
+          if (seed % 3 === 0) continue;                        // sparse — ~33% of columns active
+          const speed  = 110 + (seed * 31 & 0xFF) % 100;
+          const offset = (seed * 79 & 0xFF) * 3.6;
+          const head   = (k.time() * speed + offset) % (H + 200);
+          const TRAIL  = 6;
+          for (let i = 0; i < TRAIL; i++) {
+            const yy = head - i * 16;
+            if (yy < -18 || yy > H + 4) continue;
+            const ci = ((seed * 19) + i + Math.floor(k.time() * 8)) % RAIN_CHARS.length;
+            k.drawText({
+              text: RAIN_CHARS[ci], size: 11,
+              pos: k.vec2(x, yy),
+              color: i === 0 ? k.rgb(180, 255, 200) : k.rgb(20, 200, 60),
+              opacity: i === 0 ? 0.70 : 0.22 * (1 - i / TRAIL),
+            });
+          }
+        }
+      }
+
+      // ── Horizon glow: deep green tint ─────────────────────────────────────
       k.drawSprite({
         sprite: "horizon_glow",
         pos: k.vec2(0, GROUND_Y - 200),
         scale: k.vec2(W / 200, 1),
-        color: k.rgb(80, 150, 220),
-        opacity: 0.40,
+        color: k.rgb(30, 180, 80),
+        opacity: 0.30,
       });
-      // Floating diagrams, tinted cyan, parallax 0.22
+
+      // ── Floating architecture diagrams (tinted green, par 0.22) ──────────
       {
         const par = 0.22, SP = 340;
         const scroll = camX * par;
@@ -2962,39 +3049,34 @@ k.scene("level", (data: { idx: number; score: number }) => {
           k.drawSprite({
             sprite: `diagram${variant}`,
             pos: k.vec2(i * SP - off, ny),
-            opacity: 0.75,
-            color: k.rgb(140, 190, 230),
+            opacity: 0.55,
+            color: k.rgb(60, 200, 100),    // green-tinted diagrams
           });
         }
       }
-      // Contact shadow + tinted ground tiles
-      k.drawRect({ pos: k.vec2(0, GROUND_Y - 16), width: W, height: 16, color: k.rgb(0, 0, 0), opacity: 0.4 });
+
+      // ── Ground tiles + floor labels ───────────────────────────────────────
+      k.drawRect({ pos: k.vec2(0, GROUND_Y - 16), width: W, height: 16, color: k.rgb(0, 0, 0), opacity: 0.55 });
       const startX2 = Math.floor((camX - W / 2) / 80) * 80;
       for (let gx = startX2; gx < camX + W / 2 + 80; gx += 80) {
         k.drawSprite({
           sprite: "groundtile",
           pos: k.vec2(gx - camX + W / 2, GROUND_Y),
           scale: k.vec2(2),
-          color: k.rgb(120, 150, 200),
+          color: k.rgb(40, 120, 60),       // green-tinted ground
         });
       }
-      // Mixed-color floor labels: cyan / red / green per the mockup
       const labelSp2 = 200;
       const startLX2 = Math.floor((camX - W / 2) / labelSp2) * labelSp2;
       for (let lx = startLX2; lx < camX + W / 2 + labelSp2; lx += labelSp2) {
         const li = (lx / labelSp2) | 0;
         const which = ((li % 3) + 3) % 3;
-        const label =
-          which === 0 ? "JRA-123" : which === 1 ? "TKT-123" : "JRA-456";
-        const col =
-          which === 0 ? k.rgb(120, 200, 255)
-            : which === 1 ? k.rgb(150, 220, 230)
-              : k.rgb(232, 76, 60);
-        k.drawText({
-          text: label, size: 11,
-          pos: k.vec2(lx - camX + W / 2, GROUND_Y + 14),
-          color: col,
-        });
+        const label  = which === 0 ? "JRA-123" : which === 1 ? "TKT-123" : "JRA-456";
+        const col    = which === 0 ? k.rgb(80, 230, 140)
+                     : which === 1 ? k.rgb(120, 255, 160)
+                     : k.rgb(40, 200, 100);
+        k.drawText({ text: label, size: 11,
+          pos: k.vec2(lx - camX + W / 2, GROUND_Y + 14), color: col });
       }
       return;
     }
