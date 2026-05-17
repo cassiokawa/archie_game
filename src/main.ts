@@ -3777,6 +3777,96 @@ k.scene("level", (data: { idx: number; score: number }) => {
       if (barrier.tick > 0.18) { barrier.tick = 0; barrier.hits.clear(); }
     });
   }
+  // ---------------------------------------------------------------------------
+  // ARCH-315: Refactoring Hammer — two-tier attack system.
+  //   TAP  space → normal swing (0.45s wind-up, destroys golem + legacy blocks)
+  //   HOLD space → charge accumulates; release fires OVERLOAD EXPLOSION
+  //                (radius 120, damages all enemies + archie, destroys all blocks)
+  // ---------------------------------------------------------------------------
+  let hammerChargeT = 0;
+  let hammerCharging = false;
+  let hammerChargeLabel: any = null;
+
+  function fireHammerSwing(overload = false) {
+    const swingDmg = overload ? WEAPONS[1].dmg * 4 : WEAPONS[1].dmg;
+    const swingR   = overload ? 120 : 52;
+    const pos      = k.vec2(archie.pos.x, archie.pos.y);
+
+    if (overload) {
+      // Overload: circular shockwave that hits everything in radius
+      k.shake(10);
+      k.addKaboom(pos, { scale: 1.4 });
+      // Visual ring
+      k.add([
+        k.circle(swingR), k.pos(pos), k.anchor("center"),
+        k.color(255, 160, 40), k.opacity(0.7),
+        k.lifespan(0.25, { fade: 0.2 }), k.z(22),
+      ]);
+      // Hit every enemy in radius
+      let hitAny = false;
+      for (const e of k.get("enemy")) {
+        if (e.pos.dist(pos) < swingR) {
+          hitAny = true;
+          e.hurt(swingDmg);
+          if (e.exists()) {
+            k.addKaboom(e.pos, { scale: 0.6 });
+            popup(e.pos, `OVERLOADED -${swingDmg}`, [255, 120, 40]);
+          }
+        }
+      }
+      // Destroy all golem / legacy blocks in radius
+      for (const blk of [...golemBlocks, ...k.get("legacycode")]) {
+        if (blk.exists() && blk.pos.dist(pos) < swingR) {
+          k.addKaboom(blk.pos, { scale: 0.5 });
+          k.destroy(blk);
+          score += 120;
+        }
+      }
+      // Self-damage — overload costs Archie 1 coffee half
+      damageArchie(1);
+      popup(archie.pos, "OVERLOAD BACKFIRE!", [255, 80, 80]);
+      if (!hitAny) popup(archie.pos, "REGRESSION BUG!", [255, 80, 80]);
+    } else {
+      // Normal swing: directional hitbox in front of Archie
+      let hit = false;
+      const swing = k.add([
+        k.sprite("hammer"),
+        k.pos(archie.pos.x + archie.facing * 36, archie.pos.y + 6),
+        k.area({ scale: 1.5 }), k.anchor("center"), k.scale(SCALE), k.z(11),
+        k.lifespan(0.2), "weapon", "heavy",
+        { hits: new Set<number>(), weaponDmg: swingDmg },
+      ]);
+      swing.flipX = archie.facing < 0;
+      swing.onCollide("enemy", () => { hit = true; });
+      // Destroy golem DS blocks on normal hit
+      swing.onCollide("golem", (b: any) => {
+        hit = true;
+        if (b.exists()) {
+          k.addKaboom(b.pos, { scale: 0.5 });
+          const idx2 = golemBlocks.indexOf(b);
+          if (idx2 !== -1) golemBlocks.splice(idx2, 1);
+          k.destroy(b);
+          score += 150;
+          popup(b.pos, "DS BLOCK SMASHED!", [150, 255, 150]);
+        }
+      });
+      swing.onCollide("legacycode", (b: any) => {
+        hit = true;
+        if (b.exists()) {
+          k.addKaboom(b.pos); k.destroy(b); score += 120;
+          popup(b.pos, "LEGACY CODE SMASHED", [150, 255, 150]);
+        }
+      });
+      k.wait(0.22, () => {
+        archie.frozen = false; hammerBusy = false;
+        if (!hit) {
+          popup(archie.pos, "REGRESSION BUG!", [255, 80, 80]);
+          archie.exposedUntil = k.time() + 1.5;
+        }
+      });
+    }
+  }
+
   function doHammer() {
     if (hammerBusy || archie.frozen) return;
     hammerBusy = true;
@@ -3792,36 +3882,71 @@ k.scene("level", (data: { idx: number; score: number }) => {
     k.wait(0.45, () => {
       follow.cancel();
       if (charge.exists()) k.destroy(charge);
-      let hit = false;
-      const swing = k.add([
-        k.sprite("hammer"),
-        k.pos(archie.pos.x + archie.facing * 36, archie.pos.y + 6),
-        k.area({ scale: 1.5 }), k.anchor("center"), k.scale(SCALE), k.z(11),
-        k.lifespan(0.2), "weapon", "heavy",
-        { hits: new Set<number>(), weaponDmg: WEAPONS[1].dmg },
-      ]);
-      swing.flipX = archie.facing < 0;
-      swing.onCollide("enemy", () => { hit = true; });
-      swing.onCollide("legacycode", (b: any) => {
-        hit = true;
-        if (b.exists()) {
-          k.addKaboom(b.pos); k.destroy(b); score += 120;
-          popup(b.pos, "LEGACY CODE SMASHED", [150, 255, 150]);
-        }
-      });
-      k.wait(0.22, () => {
-        archie.frozen = false; hammerBusy = false;
-        if (!hit) {
-          popup(archie.pos, "REGRESSION BUG!", [255, 80, 80]);
-          archie.exposedUntil = k.time() + 1.5;
-        }
-      });
+      fireHammerSwing(false);
     });
   }
+
+  // Space press → normal swing (or start charge if held)
+  // Space release → if charged enough, fire overload
   k.onKeyPress("space", () => {
     const w = WEAPONS[weaponIdx];
-    if (w.kind === "melee") doBlueprint();
-    else if (w.kind === "heavy") doHammer();
+    if (w.kind === "melee") { doBlueprint(); return; }
+    if (w.kind === "heavy") {
+      if (hammerBusy || archie.frozen) return;
+      hammerChargeT = k.time();
+      hammerCharging = true;
+      // Show a growing charge bar label above Archie
+      hammerChargeLabel = k.add([
+        k.text("▮ CHARGING... ▮", { size: 12 }),
+        k.pos(archie.pos.x, archie.pos.y - 72), k.anchor("center"),
+        k.color(255, 140, 0), k.outline(2, k.rgb(16, 16, 24)), k.z(30),
+        k.opacity(1),
+      ]);
+    }
+  });
+
+  k.onKeyRelease("space", () => {
+    if (WEAPONS[weaponIdx].kind !== "heavy") return;
+    if (!hammerCharging) return;
+    hammerCharging = false;
+    const held = k.time() - hammerChargeT;
+    if (hammerChargeLabel && hammerChargeLabel.exists()) k.destroy(hammerChargeLabel);
+    hammerChargeLabel = null;
+
+    if (held >= 0.9 && !hammerBusy && !archie.frozen) {
+      // Overload path — charged long enough
+      hammerBusy = true;
+      archie.frozen = true;
+      k.add([
+        k.text("★ OVERLOAD ★", { size: 18 }),
+        k.pos(archie.pos.x, archie.pos.y - 72), k.anchor("center"),
+        k.color(255, 80, 0), k.outline(3, k.rgb(16, 16, 24)), k.z(30),
+        k.lifespan(0.7, { fade: 0.3 }), k.opacity(1),
+      ]);
+      k.wait(0.15, () => {
+        fireHammerSwing(true);
+        k.wait(0.25, () => { archie.frozen = false; hammerBusy = false; });
+      });
+    } else {
+      // Not charged enough — do a normal swing
+      doHammer();
+    }
+  });
+
+  // Update the charge label to follow Archie and pulse colour
+  k.onUpdate(() => {
+    if (!hammerCharging || !hammerChargeLabel || !hammerChargeLabel.exists()) return;
+    const held = k.time() - hammerChargeT;
+    hammerChargeLabel.pos.x = archie.pos.x;
+    hammerChargeLabel.pos.y = archie.pos.y - 72;
+    const ready = held >= 0.9;
+    hammerChargeLabel.color = ready
+      ? k.rgb(255, 60, 0)                                    // red = READY
+      : k.rgb(255, Math.round(140 + held / 0.9 * 80), 0);  // orange ramp
+    const bars = Math.min(8, Math.floor((held / 0.9) * 8));
+    hammerChargeLabel.text = ready
+      ? "★ RELEASE = OVERLOAD ★"
+      : `[${"▮".repeat(bars)}${"▯".repeat(8 - bars)}] CHARGING`;
   });
 
   function popup(p: any, txt: string, col: number[]) {
