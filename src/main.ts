@@ -2309,6 +2309,194 @@ const BOSSES: {
   { name: "THE TOGAF ADM FRAMEWORK MONSTER", sprite: "boss", hp: 64, mult: 1.05, attacks: ["shoot3", "summon", "charge"] },
 ];
 
+// =============================================================================
+// ARCH-442: BOSS PRELUDE DATA — per-layer cinematic content.
+// Each entry drives the fake crash + philosophical interrogation sequence
+// that plays the moment Archie crosses bossGateX.
+// =============================================================================
+const BOSS_PRELUDES: Array<{
+  chapter: string;
+  errors: string[];
+  stopCode: string;
+  questions: string[];
+}> = [
+  // ── Layer 0: The Agile Trenches ────────────────────────────────────────────
+  {
+    chapter: "CHAPTER I  ·  THE PRODUCT VOID",
+    errors: [
+      "NullPointerException: product_vision.getValue()",
+      "FATAL: roadmap.contains(reality) → false",
+      "Error 404: customer.needs not found",
+      "TypeError: Cannot read 'definition' of 'done'",
+      "SEGFAULT at 0xDEAD: user_story.acceptanceCriteria",
+      "CRITICAL: infinite sprint detected — loop count: 47",
+      "WARNING: backlog.size() > INT_MAX",
+      "PANIC: stakeholder.expectation != deliverable",
+      "ERR: MVP contains 0 features with measurable value",
+      "ABORT: product_owner.exists() → false",
+      "FATAL: definition_of_done was never defined",
+      "ERR_OVERFLOW: scope creep exceeded universe boundaries",
+    ],
+    stopCode: "STOP 0x000MVP  UNDEFINED_VALUE_PROPOSITION",
+    questions: [
+      "DO YOU KNOW THE PRODUCT DEFINITION?",
+      "WHO IS YOUR CLIENT?",
+      "HOW DO YOU CREATE VALUE?",
+      "WHAT DOES 'DONE' ACTUALLY MEAN?",
+    ],
+  },
+  // ── Layer 1: Solutions Architecture ────────────────────────────────────────
+  {
+    chapter: "CHAPTER II  ·  THE ARCHITECTURE ABYSS",
+    errors: [
+      "StackOverflowError: domain_model recursion depth exceeded",
+      "CyclicDependencyException: ServiceA → B → C → A",
+      "FATAL: bounded_context.boundaries not defined",
+      "NullPointerException: non_functional_requirements",
+      "Error: aggregate_root has no root cause",
+      "PANIC: event_sourcing started before coffee",
+      "ABORT: 'microservices' where monolith required",
+      "CRITICAL: whiteboard.diagram != production.reality",
+      "ERR 500: CAP_theorem violated simultaneously",
+      "FATAL: requirements.doc last updated 2019",
+      "PANIC: scalability considered after launch",
+      "ERR: architecture_decision_record.count = 0",
+    ],
+    stopCode: "STOP 0x000ADR  UNDEFINED_ARCHITECTURE_DECISION",
+    questions: [
+      "WHAT PROBLEM IS YOUR ARCHITECTURE SOLVING?",
+      "WHAT ARE THE TECHNICAL REQUIREMENTS?",
+      "WHAT ARE THE NON-TECHNICAL REQUIREMENTS?",
+      "CAN YOU EXPLAIN IT WITHOUT A WHITEBOARD?",
+    ],
+  },
+  // ── Layer 2: Swamp of Duplication ──────────────────────────────────────────
+  {
+    chapter: "CHAPTER III  ·  THE COPY-PASTE SWAMP",
+    errors: [
+      "DuplicateKeyException: 47 copies of UserService detected",
+      "FATAL: DRY principle violated 2,847 times",
+      "Error: single_source_of_truth has 14 conflicting sources",
+      "PANIC: merge conflict inside merge conflict resolution",
+      "CRITICAL: TODO: remove after launch (added 2018)",
+      "NullPointerException: data_schema.owner not found",
+      "WARNING: copy-paste inheritance depth = 23 levels",
+      "ERR: database.normalization_level < 1 in PRODUCTION",
+      "ABORT: god_class.lines_of_code = 48,291",
+      "FATAL: technical_debt.interest > annual_revenue",
+      "ERR: 'legacy' folder contains the entire product",
+      "PANIC: README.md last modified by person who left",
+    ],
+    stopCode: "STOP 0x000DRY  DUPLICATE_RESPONSIBILITY_EXCEPTION",
+    questions: [
+      "WHERE IS YOUR SINGLE SOURCE OF TRUTH?",
+      "WHO OWNS EACH PIECE OF DATA?",
+      "HOW DO YOU PREVENT COPY-PASTE DECAY?",
+      "IS YOUR SCHEMA SERVING THE DOMAIN?",
+    ],
+  },
+  // ── Layer 3: Hardware Hell ──────────────────────────────────────────────────
+  {
+    chapter: "CHAPTER IV  ·  HARDWARE HELL",
+    errors: [
+      "TimeoutException: server.provisioning_time = 3 months",
+      "OutOfMemoryError: heap exhausted on prod (no staging env)",
+      "FATAL: vendor_lock_in.severity = CATASTROPHIC",
+      "Error: infrastructure.monthly_cost > entire_budget",
+      "PANIC: on_premise + cloud + cloud2 + mainframe all running",
+      "CRITICAL: SLA promised 99.9%  →  actual uptime 67%",
+      "NullPointerException: runbook.exists() → false",
+      "ERR: docker container consuming 98% of host RAM",
+      "ABORT: 'it works on my machine' ≠ deployment strategy",
+      "FATAL: single_point_of_failure.count = ALL_OF_THEM",
+      "ERR: disaster_recovery_plan.last_tested = never",
+      "PANIC: on-call rotation points to departed employee",
+    ],
+    stopCode: "STOP 0x000OPS  INFRASTRUCTURE_OWNER_NOT_FOUND",
+    questions: [
+      "WHAT IS ACTUALLY RUNNING IN PRODUCTION?",
+      "WHO OWNS THE INFRASTRUCTURE BILL?",
+      "AT WHAT SCALE DOES THIS BREAK?",
+      "WHAT IS YOUR DISASTER RECOVERY PLAN?",
+    ],
+  },
+  // ── Layer 4: Vulnerability Vaults ──────────────────────────────────────────
+  {
+    chapter: "CHAPTER V  ·  THE EXPOSED CREDENTIALS",
+    errors: [
+      "SecurityException: API_KEY committed to public repo #1337",
+      "CRITICAL: password = 'admin123' found in production DB",
+      "PANIC: GDPR violation — PII sent to 3rd-party analytics",
+      "Error: SSL certificate expired 847 days ago",
+      "FATAL: SQL_INJECTION exploited on /api/users/search",
+      "NullPointerException: access_control_list.exists() → false",
+      "ABORT: SSH root access open to 0.0.0.0/0 since 2020",
+      "WARNING: zero_day_exploit in npm dep installed 12m ago",
+      "ERR: audit_log.integrity = COMPROMISED",
+      "CRITICAL: secrets.yaml pushed to public GitHub",
+      "PANIC: penetration_test skipped 7 sprints in a row",
+      "ERR: 'security is the next sprint' — Sprint 1, 2019",
+    ],
+    stopCode: "STOP 0x000SEC  CREDENTIALS_LEAKED_TO_INTERNET",
+    questions: [
+      "WHERE ARE YOUR SECRETS STORED?",
+      "CAN YOU NAME EVERY ATTACK SURFACE?",
+      "WHAT HAPPENS WHEN YOU ARE BREACHED?",
+      "IS YOUR DATA CLASSIFIED — AND BY WHOM?",
+    ],
+  },
+  // ── Layer 5: Cyborg Sanctum ─────────────────────────────────────────────────
+  {
+    chapter: "CHAPTER VI  ·  THE AI HYPE SINGULARITY",
+    errors: [
+      "HallucinationException: model output contains 4 facts",
+      "FATAL: AGI promised by last_year (for 9 consecutive years)",
+      "Error: training_data.bias = ALL_OF_HUMAN_BIAS",
+      "PANIC: 'just use ChatGPT' appears 47 times in backlog",
+      "CRITICAL: automation replaced 1 job → created 3 harder ones",
+      "NullPointerException: model.explainability → null",
+      "ABORT: GPU_cost > delivered_value * 1,000",
+      "WARNING: prompt_injection attack on customer-facing bot",
+      "ERR: AI ethics review skipped due to deadline pressure",
+      "FATAL: n8n workflow — 847 nodes, 0 documentation",
+      "PANIC: foundation_model licenced for 'non-commercial only'",
+      "ERR: RLHF feedback loop trained on wrong demographic",
+    ],
+    stopCode: "STOP 0x000LLM  UNDEFINED_AI_ACCOUNTABILITY",
+    questions: [
+      "DOES AI HELP — OR AUTOMATE THE WRONG THING?",
+      "WHO IS RESPONSIBLE WHEN THE MODEL IS WRONG?",
+      "WHERE IS THE HUMAN IN THE LOOP?",
+      "CAN YOU EXPLAIN THE OUTPUT TO A REGULATOR?",
+    ],
+  },
+  // ── Layer 6: The Final Framework ────────────────────────────────────────────
+  {
+    chapter: "CHAPTER VII  ·  THE FINAL FRAMEWORK",
+    errors: [
+      "FrameworkException: TOGAF phase complete — value delivered: 0",
+      "FATAL: enterprise_architecture.business_alignment = 0%",
+      "Error: 847-page governance doc blocks 3-line bug fix",
+      "PANIC: committee.approval_queue = 14 months",
+      "CRITICAL: architecture_vision exists, implementation does not",
+      "NullPointerException: strategy.owner not found",
+      "ABORT: framework adopted for the sake of the framework",
+      "WARNING: 100% of meetings are about meetings",
+      "ERR: TOGAF_ADM.cycle_count = 23, delivery_count = 0",
+      "FATAL: organisation.purpose = compliance, not outcomes",
+      "PANIC: every decision deferred to steering committee",
+      "ERR: value_stream.maps_to = compliance_report, not customer",
+    ],
+    stopCode: "STOP 0x000ADM  ENTERPRISE_STRATEGY_NULL_PTR",
+    questions: [
+      "IS THE FRAMEWORK SERVING THE BUSINESS,",
+      "OR THE BUSINESS SERVING THE FRAMEWORK?",
+      "WHO DECIDES WHAT GETS BUILT — AND WHY?",
+      "WHAT IS THE ACTUAL DESIRED OUTCOME?",
+    ],
+  },
+];
+
 const GROUND_H = 60;
 const MAX_HALVES = 10;
 
@@ -6366,6 +6554,179 @@ k.scene("level", (data: { idx: number; score: number }) => {
     });
   }
 
+  // ── ARCH-442: BOSS PRELUDE — fake crash + philosophical interrogation ────────
+  // Five-phase cinematic played when Archie crosses bossGateX, before the boss
+  // actually spawns. Freezes Archie, simulates a game crash, then presents the
+  // layer's core existential question. Keypress on phase 4 unfreezes + calls cb.
+  //   Phase 0  (0.00–0.70 s)  glitch rain — scan-line tears, RGB noise blocks
+  //   Phase 1  (0.70–2.00 s)  terminal crash dump — layer-themed error scroll
+  //   Phase 2  (2.00–2.80 s)  BSOD slam — full-screen panic card + stop code
+  //   Phase 3  (2.80–4.80 s)  blackout → questions fade in one-by-one
+  //   Phase 4  (4.80 s +)     "PRESS ANY KEY" flashes; keypress → spawn boss
+  // ─────────────────────────────────────────────────────────────────────────────
+  function startBossPrelude(cb: () => void) {
+    const PL = BOSS_PRELUDES[Math.min(idx, BOSS_PRELUDES.length - 1)];
+    archie.frozen = true;
+    const startT = k.time();
+
+    const overlay = k.add([k.fixed(), k.z(250)]);
+    let errorLines: string[] = [];
+    let awaitingKey = false;
+
+    // Pump randomised error lines into the scroll buffer during phases 0–1
+    const errorPump = k.loop(0.085, () => {
+      if (k.time() - startT >= 2.0) { errorPump.cancel(); return; }
+      const ln = PL.errors[Math.floor(Math.random() * PL.errors.length)];
+      errorLines.push(ln);
+      if (errorLines.length > 18) errorLines.shift();
+    });
+
+    // Open the "press any key" window after all phases are drawn
+    k.wait(4.8, () => {
+      awaitingKey = true;
+      const kh = k.onKeyPress(() => {
+        if (!awaitingKey) return;
+        kh.cancel();
+        errorPump.cancel();
+        k.destroy(overlay);
+        archie.frozen = false;
+        cb();
+      });
+    });
+
+    overlay.onDraw(() => {
+      const W = k.width(), H = k.height();
+      const elapsed = k.time() - startT;
+
+      // ── Phase 0: GLITCH RAIN ──────────────────────────────────────────────
+      if (elapsed < 0.70) {
+        const g = elapsed / 0.70;
+        k.drawRect({ width: W, height: H, color: k.rgb(0, 0, 0), opacity: g * 0.65 });
+        // Horizontal scan-line tears
+        for (let y = 0; y < H; y += 7) {
+          if (Math.random() < g * 0.38) {
+            const shift = (Math.random() - 0.5) * 44 * g;
+            k.drawRect({ pos: k.vec2(shift, y), width: W, height: 3,
+              color: k.rgb(255, 30, 30), opacity: 0.13 * g });
+          }
+        }
+        // RGB noise blocks
+        for (let n = 0; n < ((8 * g) | 0); n++) {
+          k.drawRect({ pos: k.vec2(Math.random() * W, Math.random() * H),
+            width: Math.random() * 130 + 15, height: 4,
+            color: n % 3 === 0 ? k.rgb(0, 255, 100) : n % 3 === 1 ? k.rgb(255, 0, 80) : k.rgb(0, 100, 255),
+            opacity: 0.09 });
+        }
+
+      // ── Phase 1: TERMINAL CRASH DUMP ─────────────────────────────────────
+      } else if (elapsed < 2.00) {
+        k.drawRect({ width: W, height: H, color: k.rgb(3, 0, 0), opacity: 0.96 });
+        // CRT scanlines
+        for (let y = 0; y < H; y += 3) {
+          if (Math.floor(k.time() * 38 + y) % 11 === 0)
+            k.drawRect({ pos: k.vec2(0, y), width: W, height: 2,
+              color: k.rgb(255, 0, 0), opacity: 0.07 });
+        }
+        // Header bar
+        k.drawRect({ pos: k.vec2(0, 0), width: W, height: 38,
+          color: k.rgb(180, 0, 0), opacity: 0.85 });
+        k.drawText({ text: ">>> SYSTEM FAILURE  ·  CORE DUMP INITIATED <<<",
+          size: 13, pos: k.vec2(W / 2, 10), anchor: "center",
+          color: k.rgb(255, 255, 255),
+          outline: { width: 1, color: k.rgb(0, 0, 0) } });
+        k.drawLine({ p1: k.vec2(0, 38), p2: k.vec2(W, 38),
+          width: 1, color: k.rgb(220, 40, 40), opacity: 0.80 });
+        // Scrolling error lines
+        for (let i = 0; i < errorLines.length; i++) {
+          const flash = Math.floor(k.time() * 20 + i) % 6 === 0;
+          k.drawText({ text: errorLines[i], size: 11,
+            pos: k.vec2(14, 52 + i * 21),
+            color: flash ? k.rgb(255, 255, 80) : k.rgb(230, 70, 55),
+            opacity: 0.94 });
+        }
+        // Blinking cursor
+        if (Math.floor(k.time() * 4) % 2 === 0) {
+          k.drawText({ text: "█", size: 12,
+            pos: k.vec2(14, 52 + errorLines.length * 21),
+            color: k.rgb(255, 80, 50), opacity: 0.90 });
+        }
+
+      // ── Phase 2: BSOD SLAM ───────────────────────────────────────────────
+      } else if (elapsed < 2.80) {
+        const t2 = (elapsed - 2.0) / 0.8;
+        k.drawRect({ width: W, height: H, color: k.rgb(0, 0, 175), opacity: 1.0 });
+        // White pixel static burst at start
+        if (t2 < 0.28) {
+          for (let n = 0; n < 70; n++) {
+            const ns = Math.random() * 7 + 2;
+            k.drawRect({ pos: k.vec2(Math.random() * W, Math.random() * H),
+              width: ns, height: ns, color: k.rgb(255, 255, 255), opacity: 0.14 });
+          }
+        }
+        const fo = (t2: number, start: number) => Math.min(1, Math.max(0, (t2 - start) / 0.25));
+        k.drawText({ text: ":(",
+          size: 80, pos: k.vec2(W * 0.16, H * 0.24), anchor: "center",
+          color: k.rgb(255, 255, 255), opacity: fo(t2, 0.0) });
+        k.drawText({ text: "Your program encountered a problem and needs to close.",
+          size: 14, pos: k.vec2(W / 2, H * 0.42), anchor: "center",
+          color: k.rgb(220, 220, 255), opacity: fo(t2, 0.15) });
+        k.drawText({ text: PL.stopCode,
+          size: 12, pos: k.vec2(W / 2, H * 0.55), anchor: "center",
+          color: k.rgb(180, 180, 255), opacity: fo(t2, 0.25) });
+        k.drawText({ text: "If you'd like to know more:",
+          size: 10, pos: k.vec2(W / 2, H * 0.65), anchor: "center",
+          color: k.rgb(160, 160, 240), opacity: fo(t2, 0.35) });
+        k.drawText({ text: "too bad. google it. there is no answer.",
+          size: 10, pos: k.vec2(W / 2, H * 0.71), anchor: "center",
+          color: k.rgb(150, 150, 230), opacity: fo(t2, 0.42) });
+
+      // ── Phase 3: BLACKOUT → QUESTIONS ────────────────────────────────────
+      } else {
+        const t3 = elapsed - 2.80;
+        k.drawRect({ width: W, height: H, color: k.rgb(0, 0, 0), opacity: 1.0 });
+
+        const fo3 = (start: number) => Math.min(1, Math.max(0, (t3 - start) / 0.55));
+
+        // Chapter title
+        k.drawText({ text: PL.chapter, size: 17,
+          pos: k.vec2(W / 2, 58), anchor: "center",
+          color: k.rgb(210, 55, 55), opacity: fo3(0.3),
+          outline: { width: 2, color: k.rgb(0, 0, 0) } });
+        if (fo3(0.5) > 0) {
+          k.drawLine({ p1: k.vec2(W * 0.12, 82), p2: k.vec2(W * 0.88, 82),
+            width: 1, color: k.rgb(150, 35, 35), opacity: fo3(0.5) * 0.65 });
+        }
+
+        // Questions appear one by one
+        for (let q = 0; q < PL.questions.length; q++) {
+          const qOp = fo3(0.65 + q * 0.38);
+          if (qOp <= 0) continue;
+          k.drawText({ text: PL.questions[q], size: 16,
+            pos: k.vec2(W / 2, 124 + q * 54), anchor: "center",
+            color: k.rgb(245, 215, 75), opacity: qOp,
+            outline: { width: 2, color: k.rgb(0, 0, 0) } });
+        }
+
+        // Hint
+        if (fo3(2.1) > 0) {
+          k.drawText({ text: "— the answer lies beyond —", size: 10,
+            pos: k.vec2(W / 2, H - 130), anchor: "center",
+            color: k.rgb(140, 120, 75), opacity: fo3(2.1) * 0.72 });
+        }
+
+        // "Press any key" flashing prompt (phase 4)
+        if (awaitingKey && Math.floor(k.time() * 3) % 2 === 0) {
+          k.drawRect({ pos: k.vec2(W / 2 - 148, H - 92), width: 296, height: 32,
+            color: k.rgb(255, 90, 90), opacity: 0.18 });
+          k.drawText({ text: "[ PRESS ANY KEY TO FACE THE TRUTH ]",
+            size: 12, pos: k.vec2(W / 2, H - 74), anchor: "center",
+            color: k.rgb(255, 205, 75),
+            outline: { width: 2, color: k.rgb(0, 0, 0) } });
+        }
+      }
+    });
+  }
+
   function onBossDefeated() {
     bossDefeated = true;
     // ARCH-230: defensive — dissolve any remaining No-Budget Block Golem
@@ -7177,7 +7538,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
       ]);
     }
 
-    // ARCH-130: cross the boss gate → the Layer's boss fight begins.
+    // ARCH-442: pre-boss cinematic — crosses the gate → prelude → boss spawn.
     if (!bossPhase && archie.pos.x > bossGateX) {
       bossPhase = true;
 
@@ -7255,13 +7616,16 @@ k.scene("level", (data: { idx: number; score: number }) => {
         k.lifespan(2.8, { fade: 0.9 }), k.opacity(1),
       ]);
 
-      spawnBoss();
-      k.add([
-        k.fixed(), k.text(`BOSS FIGHT\n${bossCfg.name}`, { size: 24, align: "center" }),
-        k.pos(k.width() / 2, 160), k.anchor("center"),
-        k.color(255, 90, 90), k.outline(3, k.rgb(16, 16, 24)), k.z(90),
-        k.lifespan(3.2, { fade: 1 }), k.opacity(1),
-      ]);
+      // ARCH-442: gate crossed → fake crash prelude → then boss spawns
+      startBossPrelude(() => {
+        spawnBoss();
+        k.add([
+          k.fixed(), k.text(`BOSS FIGHT\n${bossCfg.name}`, { size: 24, align: "center" }),
+          k.pos(k.width() / 2, 160), k.anchor("center"),
+          k.color(255, 90, 90), k.outline(3, k.rgb(16, 16, 24)), k.z(90),
+          k.lifespan(3.2, { fade: 1 }), k.opacity(1),
+        ]);
+      });
     }
   });
 
