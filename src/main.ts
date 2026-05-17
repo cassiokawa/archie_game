@@ -4303,12 +4303,20 @@ k.scene("level", (data: { idx: number; score: number }) => {
   }
   function burnoutCrash() {
     coffeeHalves = MAX_HALVES;
-    archie.pos = spawnPos.clone();
+    archie.pos = spawnPos.clone();       // spawnPos moves to boss arena on entry
     archie.cognitiveLoad = 0.4;
     archie.blessedUntil = 0; archie.espressoUntil = 0;
     archie.locked = false; archie.exposedUntil = 0;
+    crouching = false; shielding = false; whackPhase = "none";
+    if (shieldBubble && shieldBubble.exists()) {
+      if (shieldBubble._glow?.exists()) k.destroy(shieldBubble._glow);
+      k.destroy(shieldBubble); shieldBubble = null;
+    }
     score = Math.max(0, score - 400);
-    popup(archie.pos, "BURNOUT CRASH — RESTARTED THE LAYER", [255, 120, 60]);
+    const msg = bossPhase
+      ? "BURNOUT IN THE ARENA — RESPAWNING AT BOSS GATE"
+      : "BURNOUT CRASH — RESTARTED THE LAYER";
+    popup(archie.pos, msg, [255, 120, 60]);
   }
   function killReward(e: any, pts: number) {
     score += pts;
@@ -6421,6 +6429,81 @@ k.scene("level", (data: { idx: number; score: number }) => {
     // ARCH-130: cross the boss gate → the Layer's boss fight begins.
     if (!bossPhase && archie.pos.x > bossGateX) {
       bossPhase = true;
+
+      // ── ARCH-431: POINT OF NO RETURN ─────────────────────────────────────
+      // Once Archie crosses bossGateX the arena seals behind them:
+      //  1. Solid physics wall at bossGateX blocks retreating.
+      //  2. spawnPos moves inside the arena so burnout respawns here.
+      //  3. A pulsing red seal wall + "NO RETURN" banner are drawn in-world.
+
+      // 1. Invisible solid wall — full-height, 20px wide, right at the gate.
+      k.add([
+        k.rect(20, GROUND_Y),
+        k.pos(bossGateX - 10, 0),
+        k.area(),
+        k.body({ isStatic: true }),
+        k.opacity(0),
+        k.z(5),
+        "bossWall",
+      ]);
+
+      // 2. Visual seal — glowing red energy bars that pulse via onUpdate.
+      const sealBars: any[] = [];
+      const BAR_H = 40;
+      const BAR_GAP = 14;
+      for (let by = 0; by < GROUND_Y; by += BAR_H + BAR_GAP) {
+        const bar = k.add([
+          k.rect(10, BAR_H),
+          k.pos(bossGateX - 5, by),
+          k.anchor("topleft"),
+          k.color(255, 30, 30),
+          k.opacity(0.72),
+          k.z(12),
+          "bossWallVfx",
+          { baseY: by },
+        ]);
+        sealBars.push(bar);
+      }
+      // Outer glow column
+      k.add([
+        k.rect(26, GROUND_Y),
+        k.pos(bossGateX - 13, 0),
+        k.anchor("topleft"),
+        k.color(255, 60, 30),
+        k.opacity(0.12),
+        k.z(11),
+        "bossWallVfx",
+      ]);
+      // Pulse the bars each frame
+      k.onUpdate("bossWallVfx", (b: any) => {
+        b.opacity = 0.55 + Math.sin(k.time() * 6 + (b.baseY ?? 0) * 0.08) * 0.25;
+      });
+
+      // "NO RETURN" in-world text label (world-space, not fixed)
+      k.add([
+        k.text("⚠ NO RETURN", { size: 11 }),
+        k.pos(bossGateX - 6, GROUND_Y * 0.45),
+        k.anchor("center"),
+        k.color(255, 60, 60),
+        k.outline(2, k.rgb(16, 16, 24)),
+        k.rotate(-90),
+        k.z(13),
+        "bossWallVfx",
+      ]);
+
+      // 3. Move respawn checkpoint into the boss arena.
+      //    burnoutCrash() reads spawnPos.clone(), so mutating x/y is enough.
+      spawnPos.x = bossGateX + 140;
+      spawnPos.y = GROUND_Y - 90;
+
+      // HUD flash: "POINT OF NO RETURN"
+      k.add([
+        k.fixed(), k.text("⚠  POINT OF NO RETURN  ⚠", { size: 18 }),
+        k.pos(k.width() / 2, 210), k.anchor("center"),
+        k.color(255, 60, 60), k.outline(3, k.rgb(16, 16, 24)), k.z(91),
+        k.lifespan(2.8, { fade: 0.9 }), k.opacity(1),
+      ]);
+
       spawnBoss();
       k.add([
         k.fixed(), k.text(`BOSS FIGHT\n${bossCfg.name}`, { size: 24, align: "center" }),
