@@ -12,6 +12,8 @@ import {
   scope_creep, weapon_blueprint, weapon_hammer, coffee_bean, ground_tile,
   coffee_cup, weapon_wand, trap_misplacement, item_shield,
   boss_cthulhu_idle, boss_cthulhu_stun, projectile_ticket,
+  boss_kafka_roach, boss_ooze_large, boss_ooze_medium,
+  projectile_sync, hazard_data_block, hazard_data_wave,
 } from "./sprites";
 
 const k = kaboom({
@@ -2198,7 +2200,7 @@ const BRIEFINGS: {
       "CEO Approved Shield  (needed against the Leech swarms)",
       "Double Espresso (break migration blocks at full speed)",
     ],
-    bossIntel: `THE DATA LAKE LEVIATHAN  [40 HP]\nCharges the full width of the arena at high speed.\nSummons Ooze minions during pauses.\nPredict its direction. Jump late, not early.`,
+    bossIntel: `MINI-BOSS: THE KAFKA ROACH  [22 HP]\nLeft head (Sync) fires every 1s. Right head (Async) dumps 5 shots at past positions every 4s.\nUse the WAND to stun the Async head and clear its queue.\n─────────────────────────────────────\nFINAL BOSS: THE MONOLITHIC SCHEMA OOZ  [44 HP → splits]\nIMMUNE except during EXHAUSTED (3s after LEAK wave). Hammer only.\nSplits into 2 medium oozes at 50% HP — 1.5s out of phase.`,
   },
   // Layer 4 — Hardware Hell
   {
@@ -2293,7 +2295,7 @@ const BOSSES: {
 }[] = [
   { name: "THE PRODUCT DEFINITION CTHULHU", sprite: "boss1", hp: 26, mult: 1.05, attacks: ["summon", "aimshot"] },
   { name: "THE LEGACY MONOLITH MONSTER", sprite: "monolith", hp: 56, mult: 1.0, needsHammer: true, attacks: ["rain", "shoot3", "summon"] },
-  { name: "THE DATA LAKE LEVIATHAN", sprite: "boss3", hp: 40, mult: 1.05, attacks: ["charge", "summon"] },
+  { name: "THE MONOLITHIC SCHEMA OOZE", sprite: "boss_ooze_large", hp: 44, mult: 1.0, attacks: ["charge"] },
   { name: "THE SAAS / PAAS SHAPESHIFTER", sprite: "boss4", hp: 44, mult: 1.0, attacks: ["shoot3", "summon"] },
   { name: "THE EXPOSED CREDENTIALS KINGPIN", sprite: "boss5", hp: 46, mult: 1.0, attacks: ["aimshot", "shoot3"] },
   { name: "THE CLAWD n8n PAPERCLIP HYPE GUY", sprite: "boss6", hp: 48, mult: 1.0, attacks: ["rain", "charge", "summon"] },
@@ -2396,6 +2398,12 @@ k.loadSprite("armor", item_shield); // override blurry canvas arc shield
 k.loadSprite("boss_cthulhu_idle", boss_cthulhu_idle);
 k.loadSprite("boss_cthulhu_stun", boss_cthulhu_stun);
 k.loadSprite("ticket", projectile_ticket);
+k.loadSprite("boss_kafka_roach", boss_kafka_roach);
+k.loadSprite("boss_ooze_large", boss_ooze_large);
+k.loadSprite("boss_ooze_medium", boss_ooze_medium);
+k.loadSprite("projectile_sync", projectile_sync);
+k.loadSprite("hazard_data_block", hazard_data_block);
+k.loadSprite("hazard_data_wave", hazard_data_wave);
 
 k.scene("level", (data: { idx: number; score: number }) => {
   const idx = data.idx;
@@ -2414,6 +2422,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
   let bossPhase = false;
   let bossDefeated = false;
   let awsSpiderSpawned = false;
+  let kafkaRoachSpawned = false;
   // ARCH-253: Layer-4 specific state. `cloudZoneTouchT` is the last time
   // Archie was overlapping a Cloud Zone (updated every frame via
   // onCollideUpdate); `shapeshifterSpawned` gates the mid-level miniboss.
@@ -4871,6 +4880,110 @@ k.scene("level", (data: { idx: number; score: number }) => {
   // The boss is ONLY damageable in "stunned". The weapon collision handler
   // checks boss.curState() and rejects hits in all other states.
   // ===========================================================================
+  // BOSS-201: Kafka Roach mini-boss — Layer 3. Stationary dual-headed turret.
+  // Left head (Sync): fires fast cyan bullets at Archie every 1s.
+  // Right head (Async): logs Archie's past positions, dumps 5 shots every 4s.
+  // Wand hits stun the async head and clear its position queue.
+  function spawnKafkaRoach() {
+    const roachX = Math.min(LW - 600, archie.pos.x + 350);
+    const roachY = GROUND_Y - 44;
+    const posLog: Array<{ x: number; y: number }> = [];
+    let asyncStunUntil = 0;
+
+    const roach = k.add([
+      k.sprite("boss_kafka_roach"),
+      k.pos(roachX, roachY),
+      k.area({ scale: 0.85 }),
+      k.anchor("center"),
+      k.scale(SCALE * 1.6),
+      k.z(8),
+      k.health(22),
+      k.color(255, 255, 255),
+      "enemy", "boss", "kafkaroach",
+      { stunned: 0, maxHp: 22, needsHammer: false, asyncStunUntil: 0 },
+    ]);
+    bossRef = roach;
+
+    // Log Archie's position every 0.25s for the async dump
+    const logLoop = k.loop(0.25, () => {
+      if (!roach.exists()) return;
+      posLog.push({ x: archie.pos.x, y: archie.pos.y });
+      if (posLog.length > 40) posLog.shift();
+    });
+
+    // Sync head: fires fast cyan bullet at Archie every 1s
+    const syncLoop = k.loop(1.0, () => {
+      if (!roach.exists() || roach.stunned > k.time()) return;
+      const dir = archie.pos.sub(roach.pos).unit();
+      k.add([
+        k.sprite("projectile_sync"),
+        k.pos(roach.pos.x - (SCALE * 1.6 * 6), roach.pos.y),
+        k.area(),
+        k.anchor("center"),
+        k.scale(2.2),
+        k.z(9),
+        k.move(dir, 400),
+        k.offscreen({ destroy: true, distance: 700 }),
+        k.lifespan(4),
+        "enemyShot",
+      ]);
+    });
+
+    // Async head: every 4s, dump 5 bullets at past logged positions (unless stunned)
+    const asyncLoop = k.loop(4.0, () => {
+      if (!roach.exists()) return;
+      if (roach.asyncStunUntil > k.time()) {
+        posLog.length = 0;
+        popup(roach.pos, "QUEUE CLEARED!", [120, 200, 255]);
+        return;
+      }
+      const targets = posLog.splice(0, Math.min(5, posLog.length));
+      if (targets.length === 0) return;
+      popup(roach.pos, "ASYNC DUMP!", [255, 140, 60]);
+      for (let i = 0; i < targets.length; i++) {
+        k.wait(i * 0.14, () => {
+          if (!roach.exists()) return;
+          const t = targets[i];
+          const dx = t.x - roach.pos.x;
+          const dy = t.y - roach.pos.y;
+          const len = Math.sqrt(dx * dx + dy * dy) || 1;
+          k.add([
+            k.sprite("ticket"),
+            k.pos(roach.pos.x + (SCALE * 1.6 * 6), roach.pos.y),
+            k.area(),
+            k.anchor("center"),
+            k.scale(2),
+            k.z(9),
+            k.move(k.vec2(dx / len, dy / len), 230),
+            k.offscreen({ destroy: true, distance: 700 }),
+            k.lifespan(4),
+            "enemyShot",
+          ]);
+        });
+      }
+    });
+
+    roach.onDeath(() => {
+      logLoop.cancel();
+      syncLoop.cancel();
+      asyncLoop.cancel();
+      bossRef = null;
+      killReward(roach, 900);
+      popup(roach.pos, "KAFKA REFACTORED!", [150, 255, 150]);
+      k.add([
+        k.fixed(),
+        k.text("SYNC/ASYNC PARADOX RESOLVED!", { size: 20 }),
+        k.pos(k.width() / 2, 180),
+        k.anchor("center"),
+        k.color(100, 220, 255),
+        k.outline(3, k.rgb(16, 16, 24)),
+        k.z(90),
+        k.lifespan(3, { fade: 1 }),
+        k.opacity(1),
+      ]);
+    });
+  }
+
   function spawnCthulhuBoss() {
     const ARENA_LEFT  = bossGateX + 60;
     const ARENA_RIGHT = LW - 80;
@@ -4979,12 +5092,179 @@ k.scene("level", (data: { idx: number; score: number }) => {
     });
   }
 
+  // BOSS-202: Monolithic Schema Ooze — Layer 3 final boss.
+  // States: idle (immune/breathing) → table_scan (drops DB blocks) →
+  //         leak (floor wave, enters exhausted) → exhausted (3s hammer window)
+  // At 50% HP: splits into two medium oozes, 1.5s out of phase.
+  function spawnSchemaOoze(size: "large" | "medium", startX: number, phaseOffset = 0) {
+    const isLarge = size === "large";
+    const hp = isLarge ? 44 : 20;
+    const sc = isLarge ? 5.5 : 3.2;
+    const oozeY = GROUND_Y - (isLarge ? 56 : 32);
+    const ARENA_LEFT = bossGateX + 60;
+    const ARENA_RIGHT = LW - 80;
+
+    const ooze = k.add([
+      k.sprite(isLarge ? "boss_ooze_large" : "boss_ooze_medium"),
+      k.pos(startX, oozeY),
+      k.area({ scale: 0.72 }),
+      k.anchor("center"),
+      k.scale(sc),
+      k.z(8),
+      k.health(hp),
+      k.color(255, 255, 255),
+      k.state("idle", ["idle", "table_scan", "leak", "exhausted"]),
+      "enemy", "boss", "schemaooze",
+      { stunned: 0, maxHp: hp, needsHammer: true, sizeCategory: size, splitDone: false },
+    ]);
+
+    if (isLarge) bossRef = ooze;
+
+    let idleCycle = 0;
+
+    // ── STATE: IDLE — breathing pulse, fully immune ───────────────────────────
+    ooze.onStateEnter("idle", async () => {
+      ooze.use(k.color(140, 40, 180));
+      ooze.needsHammer = true;
+      // Breathing tween: expand then contract
+      const breatheOut = async () => {
+        if (!ooze.exists() || ooze.state !== "idle") return;
+        await k.tween(sc, sc * 1.14, 0.55,
+          (v: number) => { if (ooze.exists()) { ooze.scale.x = v; ooze.scale.y = v; } },
+          k.easings.easeInOutSine);
+        await k.tween(sc * 1.14, sc * 0.9, 0.55,
+          (v: number) => { if (ooze.exists()) { ooze.scale.x = v; ooze.scale.y = v; } },
+          k.easings.easeInOutSine);
+        await k.tween(sc * 0.9, sc, 0.3,
+          (v: number) => { if (ooze.exists()) { ooze.scale.x = v; ooze.scale.y = v; } },
+          k.easings.easeOutSine);
+        if (ooze.exists() && ooze.state === "idle") breatheOut();
+      };
+      breatheOut();
+      const waitTime = (idleCycle === 0 ? 2.0 + phaseOffset : 1.5);
+      await k.wait(waitTime);
+      if (!ooze.exists()) return;
+      if (idleCycle % 2 === 0) {
+        ooze.enterState("table_scan");
+      } else {
+        ooze.enterState("leak");
+      }
+      idleCycle++;
+    });
+
+    // ── STATE: TABLE_SCAN — drops Data Blocks that become static walls ────────
+    ooze.onStateEnter("table_scan", async () => {
+      ooze.use(k.color(255, 140, 40));
+      popup(ooze.pos, "TABLE SCAN INITIATED", [255, 160, 60]);
+      let dropped = 0;
+      const dropHandle = k.loop(0.55, () => {
+        if (!ooze.exists()) { dropHandle.cancel(); return; }
+        const bx = ARENA_LEFT + k.rand(40, Math.max(60, ARENA_RIGHT - ARENA_LEFT - 40));
+        const block = k.add([
+          k.sprite("hazard_data_block"),
+          k.pos(bx, 50),
+          k.area(),
+          k.body(),
+          k.anchor("center"),
+          k.scale(SCALE),
+          k.z(7),
+          "hazard", "datablock",
+        ]);
+        // When the block lands it freezes in place
+        block.onGround(() => {
+          if (block.exists()) {
+            block.use(k.body({ isStatic: true }));
+          }
+        });
+        k.wait(14, () => { if (block.exists()) k.destroy(block); });
+        dropped++;
+        if (dropped >= 4) {
+          dropHandle.cancel();
+          k.wait(1.0, () => { if (ooze.exists()) ooze.enterState("idle"); });
+        }
+      });
+    });
+
+    // ── STATE: LEAK — squish + horizontal wave + → exhausted ─────────────────
+    ooze.onStateEnter("leak", async () => {
+      ooze.use(k.color(220, 50, 80));
+      popup(ooze.pos, "DATA LEAK!", [255, 80, 80]);
+      // Telegraph: squish vertically
+      await k.tween(sc, sc * 0.42, 0.22,
+        (v: number) => { if (ooze.exists()) { ooze.scale.y = v; } },
+        k.easings.easeOutQuad);
+      if (!ooze.exists()) return;
+      // Fire horizontal wave in both directions at floor level
+      for (const dir of [-1, 1]) {
+        k.add([
+          k.sprite("hazard_data_wave"),
+          k.pos(ooze.pos.x, GROUND_Y - 10),
+          k.area(),
+          k.anchor("center"),
+          k.scale(SCALE),
+          k.z(7),
+          k.move(k.vec2(dir, 0), 340),
+          k.offscreen({ destroy: true, distance: 500 }),
+          k.lifespan(5),
+          "hazard", "datawave",
+        ]);
+      }
+      k.shake(5);
+      // Restore scale
+      await k.tween(sc * 0.42, sc, 0.28,
+        (v: number) => { if (ooze.exists()) { ooze.scale.y = v; } },
+        k.easings.easeOutBack);
+      if (ooze.exists()) ooze.enterState("exhausted");
+    });
+
+    // ── STATE: EXHAUSTED — 3s window, vulnerable to Hammer ──────────────────
+    ooze.onStateEnter("exhausted", async () => {
+      ooze.use(k.color(80, 220, 140));
+      ooze.needsHammer = false;        // open to any weapon during window
+      popup(ooze.pos, "EXHAUSTED — HIT IT NOW!", [80, 255, 150]);
+      await k.wait(3.0);
+      if (!ooze.exists()) return;
+      ooze.needsHammer = true;
+      ooze.enterState("idle");
+    });
+
+    // ── SPLIT at 50% HP ───────────────────────────────────────────────────────
+    ooze.on("hurt", () => {
+      if (!ooze.exists()) return;
+      if (isLarge && !ooze.splitDone && ooze.hp() <= ooze.maxHp * 0.5) {
+        ooze.splitDone = true;
+        k.shake(8);
+        popup(ooze.pos, "SCHEMA SPLITS!", [220, 100, 255]);
+        spawnSchemaOoze("medium", ooze.pos.x - 80, 0);
+        spawnSchemaOoze("medium", ooze.pos.x + 80, 1.5);
+        bossRef = null;
+        k.wait(0.15, () => { if (ooze.exists()) k.destroy(ooze); });
+      }
+    });
+
+    ooze.onDeath(() => {
+      killReward(ooze, isLarge ? 1800 : 700);
+      if (isLarge) {
+        bossRef = null;
+      } else {
+        // Only trigger victory when both medium oozes are gone
+        k.wait(0.3, () => {
+          if (k.get("schemaooze").filter((e: any) => e.exists()).length === 0) {
+            bossRef = null;
+            onBossDefeated();
+          }
+        });
+      }
+    });
+  }
+
   function spawnBoss() {
     // ARCH-294: Layer 7 routes to the custom Final Boss instead of the
     // generic spawnBoss factory (which has no mutation cycle or ADM gate).
     if (idx === 6) return spawnFinalBoss();
     // BOSS-101: Layer 1 uses the state-machine Cthulhu instead of the generic boss.
     if (idx === 0) return spawnCthulhuBoss();
+    if (idx === 2) return spawnSchemaOoze("large", Math.min(LW - 200, archie.pos.x + 420));
     const e = k.add([
       k.sprite(bossCfg.sprite), k.pos(Math.min(LW - 160, archie.pos.x + 380), 240),
       k.area(), k.anchor("center"), k.scale(SCALE * bossCfg.mult), k.z(8),
@@ -5171,6 +5451,21 @@ k.scene("level", (data: { idx: number; score: number }) => {
     if (e.is("cthulhu") && e.state !== "stunned" && !blessed) {
       popup(e.pos, "WAIT FOR THE SLAM!", [200, 150, 255]);
       return;
+    }
+    // BOSS-202: Schema Ooze is immune in all states except "exhausted".
+    // During idle/table_scan/leak, hitting it bounces Archie back.
+    if (e.is("schemaooze") && e.state !== "exhausted" && !blessed) {
+      archie.pos.x -= archie.facing * 50;
+      archie.jump(320);
+      popup(e.pos, "IMMUNE — WAIT FOR EXHAUSTION", [180, 80, 220]);
+      return;
+    }
+
+    // BOSS-201: Kafka Roach — Wand (aoe) hits stun the Async head & clear queue.
+    if (e.is("kafkaroach") && !w.is("heavy") && !w.is("projectile")) {
+      e.asyncStunUntil = k.time() + 4.0;
+      popup(e.pos, "ASYNC HEAD STUNNED (4s)", [80, 200, 255]);
+      // Still allow damage to fall through
     }
     // ARCH-296: Final Boss is INVULNERABLE unless the ADM A→H cycle has just
     // been completed (admVulnerableUntil > now). CTO blessing bypasses.
@@ -5704,6 +5999,23 @@ k.scene("level", (data: { idx: number; score: number }) => {
         k.pos(k.width() / 2, 220), k.anchor("center"),
         k.color(168, 111, 208), k.outline(3, k.rgb(16, 16, 24)), k.z(90),
         k.lifespan(3, { fade: 0.8 }), k.opacity(1),
+      ]);
+    }
+
+    // BOSS-201: Layer 3 Kafka Roach mini-boss appears at ~45% of level width.
+    if (idx === 2 && !kafkaRoachSpawned && archie.pos.x > LW * 0.45) {
+      kafkaRoachSpawned = true;
+      spawnKafkaRoach();
+      k.add([
+        k.fixed(),
+        k.text("!! THE KAFKA ROACH APPEARS !!\nSYNC/ASYNC PARADOX", { size: 20, align: "center" }),
+        k.pos(k.width() / 2, 220),
+        k.anchor("center"),
+        k.color(0, 188, 212),
+        k.outline(3, k.rgb(16, 16, 24)),
+        k.z(90),
+        k.lifespan(3.2, { fade: 0.8 }),
+        k.opacity(1),
       ]);
     }
 

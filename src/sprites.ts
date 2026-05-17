@@ -255,3 +255,103 @@ export const projectile_ticket = wrapSVG(`
   <rect x="5" y="10" width="5" height="1"  fill="#D4AC0D"/>
   <rect x="3" y="2" width="1"  height="12" fill="#F39C12"/>
 `);
+
+// =============================================================================
+// BOSS-201: THE KAFKA ROACH — Layer 3 mini-boss sprites + projectiles.
+// =============================================================================
+
+// KAFKA ROACH: dual-headed cockroach. Left head = Sync (cyan), right = Async (orange).
+export const boss_kafka_roach = wrapSVG(`
+  <!-- Left head (Sync - cyan) -->
+  <rect x="0" y="4" width="5" height="8" fill="#00838F"/>
+  <rect x="1" y="5" width="3" height="6" fill="#00BCD4"/>
+  <rect x="1" y="5" width="2" height="2" fill="#FFFFFF"/>
+  <rect x="1" y="5" width="1" height="1" fill="#000000"/>
+  <!-- Central body -->
+  <rect x="5" y="5" width="6" height="6" fill="#4E342E"/>
+  <rect x="5" y="6" width="6" height="4" fill="#6D4C41"/>
+  <rect x="5" y="7" width="6" height="1" fill="#3E2723"/>
+  <!-- Right head (Async - orange) -->
+  <rect x="11" y="4" width="5" height="8" fill="#E65100"/>
+  <rect x="12" y="5" width="3" height="6" fill="#FF6F00"/>
+  <rect x="13" y="5" width="2" height="2" fill="#FFFFFF"/>
+  <rect x="14" y="5" width="1" height="1" fill="#000000"/>
+  <!-- Legs -->
+  <rect x="1" y="11" width="1" height="3" fill="#212121"/>
+  <rect x="3" y="12" width="1" height="2" fill="#212121"/>
+  <rect x="6" y="10" width="1" height="3" fill="#212121"/>
+  <rect x="9" y="10" width="1" height="3" fill="#212121"/>
+  <rect x="12" y="11" width="1" height="3" fill="#212121"/>
+  <rect x="14" y="12" width="1" height="2" fill="#212121"/>
+  <!-- Antennae -->
+  <rect x="0" y="1" width="1" height="3" fill="#00BCD4"/>
+  <rect x="2" y="2" width="1" height="2" fill="#00BCD4"/>
+  <rect x="14" y="1" width="1" height="3" fill="#FF6F00"/>
+  <rect x="13" y="2" width="1" height="2" fill="#FF6F00"/>
+`);
+
+// =============================================================================
+// BOSS-202: THE MONOLITHIC SCHEMA OOZE — Layer 3 final boss sprites + hazards.
+// =============================================================================
+
+// LARGE OOZE: big purple blob with table-scan lines and red core.
+export const boss_ooze_large = wrapSVG(`
+  <rect x="1" y="3" width="14" height="10" fill="#4A148C"/>
+  <rect x="0" y="5" width="16" height="6" fill="#6A1B9A"/>
+  <rect x="3" y="1" width="10" height="14" fill="#6A1B9A"/>
+  <rect x="4" y="2" width="8" height="12" fill="#7B1FA2"/>
+  <rect x="5" y="5" width="6" height="6" fill="#AD1457"/>
+  <rect x="6" y="6" width="4" height="4" fill="#E91E63"/>
+  <rect x="7" y="7" width="2" height="2" fill="#F48FB1"/>
+  <rect x="3" y="4" width="10" height="1" fill="#38006B"/>
+  <rect x="3" y="7" width="10" height="1" fill="#38006B"/>
+  <rect x="3" y="10" width="10" height="1" fill="#38006B"/>
+  <rect x="7" y="4" width="2" height="7" fill="#38006B"/>
+`);
+
+// MEDIUM OOZE: smaller darker blob (spawned at split).
+export const boss_ooze_medium = wrapSVG(`
+  <rect x="2" y="3" width="12" height="10" fill="#4A148C"/>
+  <rect x="1" y="5" width="14" height="6" fill="#6A1B9A"/>
+  <rect x="4" y="2" width="8" height="12" fill="#6A1B9A"/>
+  <rect x="5" y="4" width="6" height="8" fill="#7B1FA2"/>
+  <rect x="5" y="5" width="6" height="6" fill="#880E4F"/>
+  <rect x="6" y="6" width="4" height="4" fill="#C2185B"/>
+  <rect x="3" y="6" width="10" height="1" fill="#38006B"/>
+  <rect x="3" y="9" width="10" height="1" fill="#38006B"/>
+  <rect x="7" y="4" width="2" height="7" fill="#38006B"/>
+`);
+
+// SYNC PROJECTILE: fast cyan horizontal dart (Sync head bullet).
+export const projectile_sync = wrapSVG(`
+  <rect x="0" y="6" width="12" height="4" fill="#006064"/>
+  <rect x="0" y="6" width="12" height="2" fill="#00BCD4"/>
+  <rect x="12" y="7" width="2" height="2" fill="#00BCD4"/>
+  <rect x="14" y="7" width="2" height="2" fill="#E0F7FA"/>
+  <rect x="2" y="6" width="8" height="1" fill="#B2EBF2"/>
+`);
+
+// DATA BLOCK HAZARD: heavy grey falling DB block.
+export const hazard_data_block = wrapSVG(`
+  <rect x="0" y="0" width="16" height="16" fill="#37474F"/>
+  <rect x="0" y="0" width="16" height="2" fill="#607D8B"/>
+  <rect x="0" y="0" width="2" height="16" fill="#607D8B"/>
+  <rect x="14" y="0" width="2" height="16" fill="#263238"/>
+  <rect x="0" y="14" width="16" height="2" fill="#263238"/>
+  <rect x="3" y="4" width="10" height="1" fill="#546E7A"/>
+  <rect x="3" y="7" width="10" height="1" fill="#546E7A"/>
+  <rect x="3" y="10" width="10" height="1" fill="#546E7A"/>
+  <rect x="7" y="4" width="2" height="7" fill="#546E7A"/>
+`);
+
+// DATA WAVE HAZARD: horizontal red PII leak wave.
+export const hazard_data_wave = wrapSVG(`
+  <rect x="0" y="4" width="16" height="8" fill="#B71C1C"/>
+  <rect x="0" y="5" width="16" height="6" fill="#E53935"/>
+  <rect x="0" y="4" width="16" height="2" fill="#EF9A9A"/>
+  <rect x="2" y="9" width="3" height="2" fill="#B71C1C"/>
+  <rect x="7" y="9" width="3" height="2" fill="#B71C1C"/>
+  <rect x="12" y="9" width="3" height="2" fill="#B71C1C"/>
+  <rect x="3" y="6" width="2" height="1" fill="#FFCDD2"/>
+  <rect x="8" y="6" width="2" height="1" fill="#FFCDD2"/>
+`);
