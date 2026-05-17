@@ -5208,34 +5208,94 @@ k.scene("level", (data: { idx: number; score: number }) => {
       boss.pos.y = HOVER_Y + Math.sin(k.time() * 2.2) * 10;
     });
 
-    // ── STATE: BRAINSTORM — drop Feature Ticket rain ──────────────────────────
-    // ARCH-BOSS1-SPEED: faster interval, wider scatter, constant-velocity fall
-    // so players can't dodge by just standing still — tickets come from the full
-    // arena width, not just below the boss.
+    // ── STATE: BRAINSTORM — Feature Ticket rain targeting Archie ─────────────
+    // Each ticket homes in on Archie's current position with a zig-zag
+    // oscillation so they can't be dodged by standing still. Alternating left/
+    // right initial offsets force the player to keep moving. Funny PM/Scrum
+    // quips float up from each drop point for flavour.
     boss.onStateEnter("brainstorm", () => {
       let dropped = 0;
-      const TICKET_COUNT  = 14;   // was 6
-      const DROP_INTERVAL = 0.18; // was 0.45
+      const TICKET_COUNT  = 14;
+      const DROP_INTERVAL = 0.20;
+
+      // ── PM / Scrum drop flavour texts ────────────────────────────────────
+      const DROP_QUIPS = [
+        "ADDING TO BACKLOG!", "STORY POINTS: ∞", "LET'S QUICK SYNC!",
+        "DEFINITION OF DONE: ???", "SCOPE APPROVED! ✓",
+        "EPIC FEATURE DROP!", "BLOCKING THE SPRINT!",
+        "JUST A SMALL TICKET!", "CUSTOMER SAYS DO EVERYTHING",
+        "REFINE THE REFINEMENT!", "VELOCITY LOOKS GREAT!",
+        "STAND-UP OVERRAN AGAIN", "REQUIREMENTS TBD",
+        "SHIP IT!  NO WAIT—", "PIVOT! (AGAIN)",
+        "ROADMAP UPDATED!", "AGILE TRANSFORMATION!",
+        "DEAR ARCHIE: FIX THIS", "CRITICAL P0 TICKET!",
+        "JIRA-4096: UNDEFINED", "CASCADING DEPENDENCIES!",
+        "THIS TAKES 2 STORY POINTS MAX", "MINIMUM VIABLE TORTURE",
+        "STAKEHOLDER APPROVED™", "PER MY LAST EMAIL…",
+        "CIRCLE BACK ON THAT!", "LET'S BOIL THE OCEAN!",
+        "DOUBLE-CLICK ON THIS", "TAKE THAT OFFLINE",
+        "UNBLOCKING YOU RIGHT NOW", "NEW BUG: ARCHIE EXISTS",
+      ];
+
+      let zigDir = 1;  // alternates so tickets come from left then right
+
       const dropHandle = k.loop(DROP_INTERVAL, () => {
-        // Scatter randomly across the full arena, not just ±70 around the boss
-        const tx = k.rand(ARENA_LEFT + 20, ARENA_RIGHT - 20);
-        // Drop height randomised slightly so they don't all arrive at once
-        const startY = boss.pos.y + k.rand(20, 60);
-        // Fall speed varies per ticket — 380-700 px/s — no two look the same
-        const fallSpeed = k.rand(380, 700);
-        // Slight lateral drift for extra chaos
-        const driftX = k.rand(-60, 60);
+        if (!archie.exists()) return;
+
+        // Alternating offset so the zig-zag pattern reads clearly
+        const offset = zigDir * k.rand(80, 210);
+        zigDir *= -1;
+
+        // Per-ticket random constants (captured before the loop fires again)
+        const startX    = archie.pos.x + offset;
+        const startY    = boss.pos.y + k.rand(24, 55);
+        const fallSpd   = k.rand(300, 560);
+        const zigAmp    = k.rand(35, 110);  // lateral oscillation amplitude
+        const zigFreq   = k.rand(4, 10);    // oscillation Hz
+
+        // Floating quip at the drop origin
+        const quip = DROP_QUIPS[Math.floor(k.rand(0, DROP_QUIPS.length))];
         k.add([
+          k.text(quip, { size: 9 }),
+          k.pos(startX, startY - 22),
+          k.anchor("center"),
+          k.color(255, 215, 50),
+          k.outline(2, k.rgb(16, 16, 24)),
+          k.z(22),
+          k.lifespan(1.4, { fade: 0.55 }),
+        ]);
+
+        // The ticket — NO k.move(); all motion handled in onUpdate below
+        const ticket = k.add([
           k.sprite("ticket"),
-          k.pos(tx, startY),
+          k.pos(startX, startY),
           k.area({ scale: 0.8 }),
           k.anchor("center"),
-          k.scale(k.rand(2.0, 3.2)), // randomise size so the shadow is ambiguous
+          k.scale(k.rand(2.0, 3.0)),
           k.z(7),
-          k.lifespan(4, { fade: 0.4 }),
-          k.move(k.vec2(driftX, fallSpeed).unit().scale(fallSpeed), 1),
+          k.lifespan(5, { fade: 0.4 }),
           "hazard", "ticket",
         ]);
+
+        let age = 0;
+        ticket.onUpdate(() => {
+          if (!ticket.exists()) return;
+          age += k.dt();
+
+          // Zig-zag: sine oscillation around Archie's live X, amplitude
+          // narrows slightly as the ticket nears the ground so the final
+          // approach still threatens the player even if they keep moving.
+          const groundFrac = Math.min(1, ticket.pos.y / GROUND_Y);
+          const lateralOsc = zigAmp * Math.sin(zigFreq * age) * (1 - groundFrac * 0.55);
+          const wantX = archie.pos.x + lateralOsc;
+
+          // Smooth horizontal drift toward the zig-zagged target X
+          ticket.pos.x += (wantX - ticket.pos.x) * Math.min(1, 5 * k.dt());
+          ticket.pos.y += fallSpd * k.dt();
+
+          if (ticket.pos.y > GROUND_Y + 50) k.destroy(ticket);
+        });
+
         dropped++;
         if (dropped >= TICKET_COUNT) {
           dropHandle.cancel();
@@ -5245,7 +5305,6 @@ k.scene("level", (data: { idx: number; score: number }) => {
     });
 
     boss.onStateUpdate("brainstorm", () => {
-      // Boss bobs faster during the blitz to match the frantic pace
       boss.pos.y = HOVER_Y + Math.sin(k.time() * 5) * 8;
     });
 
@@ -5927,6 +5986,31 @@ k.scene("level", (data: { idx: number; score: number }) => {
     popup(archie.pos, "!! UNSTABLE RELEASE — CONTROLS INVERTED !!", [255, 100, 255]);
   });
   archie.onCollide("hazard", () => damageArchie(1));
+
+  // BOSS-101: When a Feature Ticket lands on Archie, flash a Scrum/PM buzzword
+  // as the "reason" the ticket existed. Purely cosmetic — damage is handled
+  // above by the generic hazard handler.
+  const TICKET_HIT_QUIPS = [
+    "TECHNICAL DEBT!",      "JIRA ASSIGNED TO YOU!",   "SPIKE NEEDED!",
+    "STAKEHOLDER SAYS SHIP!","OUT OF BANDWIDTH!",       "CIRCLE BACK LATER!",
+    "PARK THAT THOUGHT!",   "LOW-HANGING FRUIT HIT!",  "SYNERGY DETECTED!",
+    "GROOMING OVERDUE!",    "BLOCKED ON YOU!",          "P0 ESCALATION!",
+    "BUSINESS VALUE!",      "BUY-IN ACHIEVED!",         "MOVE FAST, BREAK ARCHIE",
+    "THIS WAS IN THE SPEC!", "ACCEPTANCE TEST FAILED!",  "REGRESSION FOUND!",
+    "PRE-MORTEM SKIPPED!",  "JUST A SMALL CHANGE!",     "OUT OF SPRINT!",
+    "MVP! (MINIMUM VIABLE PAIN)", "NO DEFINITION OF DONE!", "SCOPE CREEP™",
+    "AS PER MY LAST EMAIL!", "ETA? YESTERDAY.",          "WORKING AS INTENDED",
+    "HAVE YOU TRIED AGILE?", "ADDING STORY POINTS…",    "TICKET REOPENED!",
+  ];
+  let lastTicketHitT = -5;
+  archie.onCollide("ticket", () => {
+    // Rate-limit to one quip every 0.6s so rapid hits don't spam the screen
+    if (k.time() - lastTicketHitT < 0.6) return;
+    lastTicketHitT = k.time();
+    const q = TICKET_HIT_QUIPS[Math.floor(k.rand(0, TICKET_HIT_QUIPS.length))];
+    popup(archie.pos.add(k.vec2(0, -36)), q, [255, 200, 50]);
+  });
+
   archie.onCollide("enemyShot", (s: any) => { damageArchie(1); k.destroy(s); });
   // ARCH-272: Credentials shots ALSO trigger a brief DECRYPTING window — the
   // HUD's coffee row gets overlaid with a "DECRYPTING…" loading bar for ~1.6s.
