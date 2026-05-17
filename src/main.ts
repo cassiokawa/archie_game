@@ -24,6 +24,10 @@ const k = kaboom({
   crisp: true, // ARCH-121: nearest-neighbor. We want chunky pixels back.
 });
 
+// ARCH-400: Global difficulty flag — set on the title screen, read by the
+// level scene to adjust Archie's HP, enemy count/speed/HP, and item density.
+let difficulty: "easy" | "super" = "easy";
+
 
 // -----------------------------------------------------------------------------
 // ARCH-122: Pixel-art sprite factory. Draw functions work in a high-res "design"
@@ -2413,7 +2417,14 @@ k.scene("level", (data: { idx: number; score: number }) => {
   k.randSeed(Math.floor(Date.now()) + idx * 7919);
   k.setGravity(1900);
 
-  let coffeeHalves = MAX_HALVES;
+  // ARCH-401: Difficulty modifiers applied at scene boot.
+  // ESPD  — enemy movement speed multiplier (×1.5 in Super Archie).
+  // EHMULT — enemy hit-point multiplier (×2 in Super Archie).
+  const ESPD   = difficulty === "super" ? 1.5 : 1.0;
+  const EHMULT = difficulty === "super" ? 2   : 1;
+  const eHealth = (n: number) => k.health(Math.round(n * EHMULT));
+
+  let coffeeHalves = difficulty === "super" ? Math.ceil(MAX_HALVES / 2) : MAX_HALVES;
   let score = data.score;
   let weaponIdx = 0;
   let hammerBusy = false;
@@ -3342,7 +3353,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
       }
     }
     addPlatform(px, y, w, motion);
-    if (k.rand() < 0.72) {
+    if (k.rand() < (difficulty === "super" ? 0.36 : 0.72)) {
       addCollectible("bean", px + w / 2, y - 42, "bean");
     }
     px += k.rand(140, 260);
@@ -3377,15 +3388,17 @@ k.scene("level", (data: { idx: number; score: number }) => {
     addCollectible("bean", ex + ew / 2, ey - 42, "bean");
   }
   // ARCH-133: collectible/prop counts scale with the longer level.
+  // ARCH-404: Super Archie halves all help-item density.
   const playable = bossGateX - 220;
-  for (let i = 0; i < Math.round(playable / 220); i++) {
+  const beanInterval = difficulty === "super" ? 440 : 220; // ½ density in super
+  for (let i = 0; i < Math.round(playable / beanInterval); i++) {
     addCollectible("bean", k.rand(220, bossGateX), GROUND_Y - 36, "bean");
   }
   // Misplacement traps already placed above; no jira collectibles any more.
   addCollectible("armor", k.rand(320, bossGateX - 220), GROUND_Y - 40, "armor");
-  if (playable > 2200) addCollectible("armor", k.rand(320, bossGateX - 220), GROUND_Y - 40, "armor");
+  if (playable > 2200 && difficulty !== "super") addCollectible("armor", k.rand(320, bossGateX - 220), GROUND_Y - 40, "armor");
   addCollectible("espresso", k.rand(320, bossGateX - 220), GROUND_Y - 40, "espresso");
-  if (playable > 2200) addCollectible("espresso", k.rand(320, bossGateX - 220), GROUND_Y - 40, "espresso");
+  if (playable > 2200 && difficulty !== "super") addCollectible("espresso", k.rand(320, bossGateX - 220), GROUND_Y - 40, "espresso");
   // ARCH-89b: Solutions Architecture gets Legacy Code "DS" blocks (Hammer
   // required to break). Centered anchor for clean stacking, scale * 2 so each
   // native pixel becomes a satisfyingly chunky 6 screen pixels.
@@ -4167,7 +4180,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
   function spawnScopeCreep(x: number) {
     const e = k.add([
       k.sprite("scopecreep"), k.pos(x, GROUND_Y - 60), k.area(), k.body(),
-      k.anchor("center"), k.scale(SCALE), k.z(8), k.health(2),
+      k.anchor("center"), k.scale(SCALE), k.z(8), eHealth(2),
       k.offscreen({ destroy: true, distance: 900 }),
       "enemy", "fragile", { stunned: 0 },
     ]);
@@ -4180,7 +4193,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
       bubble.pos = e.pos.add(0, -56);
       if (isStunned(e)) return;
       const dir = archie.pos.x > e.pos.x ? 1 : -1;
-      e.move(95 * dir, 0); e.flipX = dir < 0;
+      e.move(95 * ESPD * dir, 0); e.flipX = dir < 0;
     });
     e.onDeath(() => killReward(e, 100));
     e.onDestroy(() => { if (bubble.exists()) k.destroy(bubble); });
@@ -4188,14 +4201,14 @@ k.scene("level", (data: { idx: number; score: number }) => {
   function spawnCockroach(x: number) {
     const e = k.add([
       k.sprite("cockroach"), k.pos(x, GROUND_Y - 40), k.area(), k.body(),
-      k.anchor("center"), k.scale(SCALE), k.z(8), k.health(5),
+      k.anchor("center"), k.scale(SCALE), k.z(8), eHealth(5),
       k.offscreen({ destroy: true, distance: 900 }),
       "enemy", { stunned: 0, dropTimer: 0 },
     ]);
     e.onUpdate(() => {
       if (isStunned(e)) return;
       const dir = archie.pos.x > e.pos.x ? 1 : -1;
-      e.move(40 * dir, 0); e.flipX = dir < 0;
+      e.move(40 * ESPD * dir, 0); e.flipX = dir < 0;
       e.dropTimer += k.dt();
       if (e.dropTimer > 0.8) {
         e.dropTimer = 0;
@@ -4212,14 +4225,14 @@ k.scene("level", (data: { idx: number; score: number }) => {
     const e = k.add([
       k.sprite("ooze"), k.pos(x, y), k.area(), k.body(),
       k.anchor("center"), k.scale(big ? SCALE : SCALE * 0.6), k.z(8),
-      k.health(big ? 6 : 3),
+      eHealth(big ? 6 : 3),
       k.offscreen({ destroy: true, distance: 1000 }),
       "enemy", { stunned: 0, big },
     ]);
     e.onUpdate(() => {
       if (isStunned(e)) return;
       const dir = archie.pos.x > e.pos.x ? 1 : -1;
-      e.move(55 * dir, 0);
+      e.move(55 * ESPD * dir, 0);
     });
     e.onDeath(() => {
       if (e.big) {
@@ -4232,21 +4245,21 @@ k.scene("level", (data: { idx: number; score: number }) => {
   function spawnPoC(x: number) {
     const e = k.add([
       k.sprite("poc"), k.pos(x, GROUND_Y - 50), k.area(), k.body(),
-      k.anchor("center"), k.scale(SCALE), k.z(8), k.health(2),
+      k.anchor("center"), k.scale(SCALE), k.z(8), eHealth(2),
       k.offscreen({ destroy: true, distance: 900 }),
       "enemy", "fragile", { stunned: 0 },
     ]);
     e.onUpdate(() => {
       if (isStunned(e)) return;
       const dir = archie.pos.x > e.pos.x ? 1 : -1;
-      e.move(190 * dir, 0); e.flipX = dir < 0;
+      e.move(190 * ESPD * dir, 0); e.flipX = dir < 0;
     });
     e.onDeath(() => { k.addKaboom(e.pos); killReward(e, 130); });
   }
   function spawnVillain(x: number) {
     const e = k.add([
       k.sprite("villain"), k.pos(x, GROUND_Y - 50), k.area(), k.body(),
-      k.anchor("center"), k.scale(SCALE), k.z(8), k.health(8),
+      k.anchor("center"), k.scale(SCALE), k.z(8), eHealth(8),
       k.offscreen({ destroy: true, distance: 900 }),
       "enemy", { stunned: 0, shootTimer: 0 },
     ]);
@@ -4255,8 +4268,8 @@ k.scene("level", (data: { idx: number; score: number }) => {
       const dist = archie.pos.x - e.pos.x;
       const dir = dist > 0 ? 1 : -1;
       e.flipX = dir < 0;
-      if (Math.abs(dist) > 320) e.move(70 * dir, 0);
-      else if (Math.abs(dist) < 200) e.move(-60 * dir, 0);
+      if (Math.abs(dist) > 320) e.move(70 * ESPD * dir, 0);
+      else if (Math.abs(dist) < 200) e.move(-60 * ESPD * dir, 0);
       e.shootTimer += k.dt();
       if (e.shootTimer > 1.4) {
         e.shootTimer = 0;
@@ -4280,7 +4293,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
       k.sprite("villain"), k.pos(x, GROUND_Y - 50), k.area(), k.body(),
       k.anchor("center"), k.scale(SCALE), k.z(8),
       k.color(255, 200, 200), // pink tint marks the Layer-5 variant
-      k.health(12),
+      eHealth(12),
       k.offscreen({ destroy: true, distance: 900 }),
       "enemy", "credentialsvillain",
       { stunned: 0, shootTimer: k.rand(0, 0.6) },
@@ -4291,8 +4304,8 @@ k.scene("level", (data: { idx: number; score: number }) => {
       const dir = dist > 0 ? 1 : -1;
       e.flipX = dir < 0;
       // tighter kiting range
-      if (Math.abs(dist) > 300) e.move(80 * dir, 0);
-      else if (Math.abs(dist) < 180) e.move(-70 * dir, 0);
+      if (Math.abs(dist) > 300) e.move(80 * ESPD * dir, 0);
+      else if (Math.abs(dist) < 180) e.move(-70 * ESPD * dir, 0);
       e.shootTimer += k.dt();
       if (e.shootTimer > 0.9) {
         e.shootTimer = 0;
@@ -4324,14 +4337,14 @@ k.scene("level", (data: { idx: number; score: number }) => {
   function spawnGlutton(x: number) {
     const e = k.add([
       k.sprite("glutton"), k.pos(x, GROUND_Y - 45), k.area(), k.body(),
-      k.anchor("center"), k.scale(SCALE), k.z(8), k.health(9),
+      k.anchor("center"), k.scale(SCALE), k.z(8), eHealth(9),
       k.offscreen({ destroy: true, distance: 900 }),
       "enemy", "glutton", { stunned: 0 },
     ]);
     e.onUpdate(() => {
       if (isStunned(e)) return;
       const dir = archie.pos.x > e.pos.x ? 1 : -1;
-      e.move(150 * dir, 0); e.flipX = dir < 0;
+      e.move(150 * ESPD * dir, 0); e.flipX = dir < 0;
     });
     e.onDeath(() => killReward(e, 220));
   }
@@ -4342,7 +4355,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
   function spawnSadMonster(x: number) {
     const e = k.add([
       k.sprite("sad_monster"), k.pos(x, GROUND_Y - 50), k.area(), k.body(),
-      k.anchor("center"), k.scale(SCALE), k.z(8), k.health(4),
+      k.anchor("center"), k.scale(SCALE), k.z(8), eHealth(4),
       k.offscreen({ destroy: true, distance: 900 }),
       "enemy", "sadmonster",
       { stunned: 0, wanderT: 0, wanderDir: k.choose([-1, 0, 0, 1]), tearT: 0 },
@@ -4355,7 +4368,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
         e.wanderT = 0;
         e.wanderDir = k.choose([-1, -1, 0, 0, 0, 1, 1]);
       }
-      e.move(28 * e.wanderDir, 0);
+      e.move(28 * ESPD * e.wanderDir, 0);
       if (e.wanderDir !== 0) e.flipX = e.wanderDir < 0;
       // Binary tear drops every ~1.2s
       e.tearT += k.dt();
@@ -4383,7 +4396,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
       k.sprite("transformer_seeker"),
       k.pos(x, GROUND_Y - 60), k.area(), k.body(),
       k.anchor("center"), k.scale(SCALE * 0.7), k.z(8),
-      k.health(18),
+      eHealth(18),
       k.offscreen({ destroy: true, distance: 900 }),
       "enemy", "seeker",
       { stunned: 0, attention: 0, lastBlast: 0, shootT: k.rand(0, 1.5) },
@@ -4468,14 +4481,14 @@ k.scene("level", (data: { idx: number; score: number }) => {
   function spawnBat(x: number, y: number) {
     const e = k.add([
       k.sprite("bat"), k.pos(x, y), k.area(), k.anchor("center"),
-      k.scale(SCALE), k.z(8), k.health(2),
+      k.scale(SCALE), k.z(8), eHealth(2),
       k.offscreen({ destroy: true, distance: 1000 }),
       "enemy", { stunned: 0 },
     ]);
     e.onUpdate(() => {
       if (isStunned(e)) return;
       const to = archie.pos.sub(e.pos).unit();
-      e.move(to.scale(110)); e.flipX = to.x < 0;
+      e.move(to.scale(110 * ESPD)); e.flipX = to.x < 0;
     });
     e.onDeath(() => killReward(e, 80));
   }
@@ -4486,7 +4499,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
   function spawnCloud(x: number, y: number) {
     const e = k.add([
       k.sprite("cloud"), k.pos(x, y), k.area(), k.anchor("center"),
-      k.scale(SCALE), k.z(8), k.health(4),
+      k.scale(SCALE), k.z(8), eHealth(4),
       "enemy", { stunned: 0, baseY: y, t: k.rand(0, 6) },
     ]);
     e.onUpdate(() => {
@@ -4494,7 +4507,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
       e.t += k.dt();
       e.pos.y = e.baseY + Math.sin(e.t * 0.8) * 18;
       const dir = archie.pos.x > e.pos.x ? 1 : -1;
-      e.move(38 * dir, 0);
+      e.move(38 * ESPD * dir, 0);
       e.flipX = dir < 0;
     });
     e.onDeath(() => killReward(e, 180));
@@ -4510,7 +4523,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
   function spawnDemon(x: number) {
     const e = k.add([
       k.sprite("demon"), k.pos(x, GROUND_Y - 90), k.area(), k.body(),
-      k.anchor("center"), k.scale(SCALE), k.z(8), k.health(6),
+      k.anchor("center"), k.scale(SCALE), k.z(8), eHealth(6),
       k.offscreen({ destroy: true, distance: 1000 }),
       "enemy", "demon", { stunned: 0 },
     ]);
@@ -4523,7 +4536,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
       bubble.pos = e.pos.add(0, -92);
       if (isStunned(e)) return;
       const dir = archie.pos.x > e.pos.x ? 1 : -1;
-      e.move(80 * dir, 0);
+      e.move(80 * ESPD * dir, 0);
       e.flipX = dir < 0;
     });
     e.onDeath(() => killReward(e, 300));
@@ -4549,7 +4562,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
     e.onUpdate(() => {
       e.t += k.dt();
       const dir = archie.pos.x > e.pos.x ? 1 : -1;
-      e.move(45 * dir, 0);
+      e.move(45 * ESPD * dir, 0);
       e.pos.y = e.baseY + Math.sin(e.t * 1.2) * 14;
       e.flipX = dir < 0;
       lbl.pos = e.pos.add(0, -54);
@@ -4574,14 +4587,14 @@ k.scene("level", (data: { idx: number; score: number }) => {
   function spawnLeech(x: number) {
     const e = k.add([
       k.sprite("leech"), k.pos(x, GROUND_Y - 16), k.area(), k.body(),
-      k.anchor("center"), k.scale(SCALE), k.z(8), k.health(1),
+      k.anchor("center"), k.scale(SCALE), k.z(8), eHealth(1),
       k.offscreen({ destroy: true, distance: 900 }),
       "enemy", "leech", { stunned: 0 },
     ]);
     e.onUpdate(() => {
       if (isStunned(e)) return;
       const dir = archie.pos.x > e.pos.x ? 1 : -1;
-      e.move(40 * dir, 0);
+      e.move(40 * ESPD * dir, 0);
       e.flipX = dir < 0;
     });
     e.onDeath(() => killReward(e, 120));
@@ -4596,7 +4609,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
     const e = k.add([
       k.sprite("cloudstalker"), k.pos(x, baseY),
       k.area(), k.anchor("center"), k.scale(SCALE), k.z(8),
-      k.health(3), k.opacity(0.25),
+      eHealth(3), k.opacity(0.25),
       k.offscreen({ destroy: true, distance: 1100 }),
       "enemy", "cloud", { stunned: 0, baseY, t: k.rand(0, 6) },
     ]);
@@ -4605,7 +4618,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
       e.t += k.dt();
       // Drift toward Archie (slow)
       const dir = archie.pos.x > e.pos.x ? 1 : -1;
-      e.move(45 * dir, 0);
+      e.move(45 * ESPD * dir, 0);
       e.pos.y = e.baseY + Math.sin(e.t * 0.8) * 18;
       e.flipX = dir < 0;
       // Visibility cross-fades smoothly toward target
@@ -4675,7 +4688,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
       if (e.form === "saas") {
         // Walk toward Archie like a SaaS rep at a conference
         const dir = archie.pos.x > e.pos.x ? 1 : -1;
-        e.move(72 * dir, 0);
+        e.move(72 * ESPD * dir, 0);
         e.flipX = dir < 0;
       } else {
         // PaaS turret — stationary, summons creeps every 2.5s
@@ -4705,7 +4718,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
       e.pos.y = e.baseY + Math.sin(e.t * 0.9) * 18;
       if (!isStunned(e)) {
         const to = archie.pos.sub(e.pos);
-        if (Math.abs(to.x) > 240) e.move(to.unit().scale(50));
+        if (Math.abs(to.x) > 240) e.move(to.unit().scale(50 * ESPD));
         e.flipX = archie.pos.x < e.pos.x;
       }
       e.lambdaT += k.dt();
@@ -5478,8 +5491,9 @@ k.scene("level", (data: { idx: number; score: number }) => {
   // ARCH-80: regular-enemy spawner — runs until the boss phase begins.
   // ARCH-134: spawn rarely + far ahead + capped by living count, so the level
   // feels populated, not infested. The backlog is large enough already.
-  const MAX_LIVE_ENEMIES = 3;
-  k.loop(2.8, () => {
+  // ARCH-403: Super Archie — 50% more enemies on-screen at once, faster wave interval.
+  const MAX_LIVE_ENEMIES = difficulty === "super" ? 5 : 3;
+  k.loop(difficulty === "super" ? 1.8 : 2.8, () => {
     if (bossPhase) return;
     if (k.get("enemy").length >= MAX_LIVE_ENEMIES) return;
     const camX = k.camPos().x;
@@ -6613,8 +6627,131 @@ k.scene("win", (score: number) => {
     k.pos(k.width() / 2, k.height() / 2), k.anchor("center"),
     k.color(58, 208, 122),
   ]);
-  k.onKeyPress("r", () => k.go("briefing", { idx: 0, score: 0 }));
+  k.onKeyPress("r", () => k.go("title"));
 });
 
-// ARCH-71: ship it — boot into the Layer 1 briefing first.
-k.go("briefing", { idx: 0, score: 0 });
+// =============================================================================
+// ARCH-400: TITLE SCREEN — Start Game / Options. Simple two-option menu.
+// =============================================================================
+k.scene("title", () => {
+  const W = k.width(), H = k.height();
+  k.add([k.rect(W, H), k.pos(0, 0), k.color(0, 0, 0)]);
+
+  // Scanlines
+  for (let y = 0; y < H; y += 4)
+    k.add([k.rect(W, 1), k.pos(0, y), k.color(255, 255, 255), k.opacity(0.03)]);
+
+  // Title
+  k.add([
+    k.text("THE\nARCHITECT'S\nDESCENT", { size: 72, align: "center" }),
+    k.pos(W / 2, 140), k.anchor("center"),
+    k.color(192, 58, 43), k.outline(4, k.rgb(0, 0, 0)),
+  ]);
+
+  // Coffee-cup icon in bottom-right corner (decorative)
+  k.add([
+    k.sprite("cup_full"),
+    k.pos(W - 56, H - 56), k.anchor("center"), k.scale(4), k.z(5),
+  ]);
+
+  // Menu items — glow on hover with sine pulse
+  const menuItems = [
+    { label: "(1) START GAME", key: "1" },
+    { label: "(2) OPTIONS",    key: "2" },
+  ];
+  const startY = 460;
+  const texts = menuItems.map((item, i) => {
+    const t = k.add([
+      k.text(item.label, { size: 28 }),
+      k.pos(W / 2, startY + i * 70), k.anchor("center"),
+      k.color(90, 160, 200), k.outline(2, k.rgb(0, 0, 0)), k.opacity(1),
+    ]);
+    return t;
+  });
+
+  // Pulse animation for both options
+  texts.forEach((t, i) => {
+    t.onUpdate(() => {
+      t.opacity = 0.7 + Math.sin(k.time() * 3 + i * 1.5) * 0.3;
+    });
+  });
+
+  k.onKeyPress("1", () => {
+    difficulty = "easy";
+    k.go("briefing", { idx: 0, score: 0 });
+  });
+  k.onKeyPress("2", () => k.go("options"));
+});
+
+// =============================================================================
+// ARCH-401: OPTIONS SCREEN — Easy vs Super Archie difficulty selection.
+// =============================================================================
+k.scene("options", () => {
+  const W = k.width(), H = k.height();
+  k.add([k.rect(W, H), k.pos(0, 0), k.color(6, 4, 14)]);
+  for (let y = 0; y < H; y += 4)
+    k.add([k.rect(W, 1), k.pos(0, y), k.color(255, 255, 255), k.opacity(0.04)]);
+
+  k.add([
+    k.text("SELECT DIFFICULTY", { size: 36 }),
+    k.pos(W / 2, 80), k.anchor("center"),
+    k.color(200, 200, 230), k.outline(3, k.rgb(0, 0, 0)),
+  ]);
+
+  // ── EASY ──────────────────────────────────────────────────────────────────
+  k.add([
+    k.text("(1)  EASY", { size: 32 }),
+    k.pos(W / 2, 200), k.anchor("center"),
+    k.color(80, 220, 120), k.outline(2, k.rgb(0, 0, 0)),
+  ]);
+  k.add([
+    k.text(
+      "Standard experience.\n" +
+      "5 coffee cups  •  normal enemy speed\n" +
+      "Regular damage & spawn rate\n" +
+      "Full item drops",
+      { size: 16, align: "center", width: 640 },
+    ),
+    k.pos(W / 2, 272), k.anchor("center"),
+    k.color(160, 220, 170),
+  ]);
+
+  // ── SUPER ARCHIE ──────────────────────────────────────────────────────────
+  k.add([
+    k.text("(2)  SUPER ARCHIE", { size: 32 }),
+    k.pos(W / 2, 370), k.anchor("center"),
+    k.color(230, 80, 80), k.outline(2, k.rgb(0, 0, 0)),
+  ]);
+  k.add([
+    k.text(
+      "Maximum corporate suffering.\n" +
+      "½ coffee cups  •  enemies move 50% faster\n" +
+      "Enemies take 2× hits to destroy\n" +
+      "50% more enemies  •  50% fewer pickups",
+      { size: 16, align: "center", width: 640 },
+    ),
+    k.pos(W / 2, 448), k.anchor("center"),
+    k.color(230, 160, 160),
+  ]);
+
+  // Footer
+  const back = k.add([
+    k.text("ESC / BACKSPACE — Back", { size: 14 }),
+    k.pos(W / 2, H - 30), k.anchor("center"),
+    k.color(100, 100, 120), k.opacity(0.7),
+  ]);
+
+  k.onKeyPress("1", () => {
+    difficulty = "easy";
+    k.go("briefing", { idx: 0, score: 0 });
+  });
+  k.onKeyPress("2", () => {
+    difficulty = "super";
+    k.go("briefing", { idx: 0, score: 0 });
+  });
+  k.onKeyPress("escape", () => k.go("title"));
+  k.onKeyPress("backspace", () => k.go("title"));
+});
+
+// ARCH-71: boot into the title screen.
+k.go("title");
