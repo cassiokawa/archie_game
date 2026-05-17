@@ -11,6 +11,7 @@ import {
   archie_fall_pose, archie_drink_pose,
   scope_creep, weapon_blueprint, weapon_hammer, coffee_bean, ground_tile,
   coffee_cup, weapon_wand, trap_misplacement, item_shield,
+  boss_cthulhu_idle, boss_cthulhu_stun, projectile_ticket,
 } from "./sprites";
 
 const k = kaboom({
@@ -2267,6 +2268,9 @@ k.loadSprite("cup_empty", coffee_cup);
 k.loadSprite("wand", weapon_wand);
 k.loadSprite("misplacement", trap_misplacement);
 k.loadSprite("armor", item_shield); // override blurry canvas arc shield
+k.loadSprite("boss_cthulhu_idle", boss_cthulhu_idle);
+k.loadSprite("boss_cthulhu_stun", boss_cthulhu_stun);
+k.loadSprite("ticket", projectile_ticket);
 
 k.scene("level", (data: { idx: number; score: number }) => {
   const idx = data.idx;
@@ -4608,10 +4612,129 @@ k.scene("level", (data: { idx: number; score: number }) => {
     return e;
   }
 
+  // ===========================================================================
+  // BOSS-101: THE MVP CTHULHU — Layer 1 boss. Kaboom state() machine.
+  //   hover     → sweeps left/right above the arena (invulnerable)
+  //   brainstorm → rains 5 Feature Ticket projectiles then transitions
+  //   slam      → warning shake then plunges to ground → vulnerable
+  //   stunned   → sits on ground for 3s, fully damageable, then rises
+  // The boss is ONLY damageable in "stunned". The weapon collision handler
+  // checks boss.curState() and rejects hits in all other states.
+  // ===========================================================================
+  function spawnCthulhuBoss() {
+    const ARENA_LEFT  = bossGateX + 60;
+    const ARENA_RIGHT = LW - 80;
+    const ARENA_MID   = (ARENA_LEFT + ARENA_RIGHT) / 2;
+    const HOVER_Y     = 80;
+    const SLAM_Y      = GROUND_Y - 56; // sits just above ground
+
+    const boss = k.add([
+      k.sprite("boss_cthulhu_idle"),
+      k.pos(ARENA_MID, HOVER_Y),
+      k.area({ scale: 0.7 }),
+      k.anchor("center"),
+      k.scale(5),
+      k.z(8),
+      k.health(bossCfg.hp),
+      k.state("hover", ["hover", "brainstorm", "slam", "stunned"]),
+      k.color(255, 255, 255),
+      "enemy", "boss", "cthulhu",
+      { stunned: 0, maxHp: bossCfg.hp, needsHammer: false },
+    ]);
+    bossRef = boss;
+
+    // ── STATE: HOVER ──────────────────────────────────────────────────────────
+    boss.onStateEnter("hover", async () => {
+      boss.use(k.sprite("boss_cthulhu_idle"));
+      boss.color = k.rgb(255, 255, 255);
+      await k.tween(boss.pos.x, ARENA_LEFT + 60, 2.0,
+        (v) => { boss.pos.x = v; }, k.easings.easeInOutSine);
+      await k.tween(boss.pos.x, ARENA_RIGHT - 60, 2.5,
+        (v) => { boss.pos.x = v; }, k.easings.easeInOutSine);
+      await k.tween(boss.pos.x, ARENA_MID, 1.0,
+        (v) => { boss.pos.x = v; }, k.easings.easeInOutSine);
+      boss.enterState("brainstorm");
+    });
+
+    boss.onStateUpdate("hover", () => {
+      boss.pos.y = HOVER_Y + Math.sin(k.time() * 2.2) * 10;
+    });
+
+    // ── STATE: BRAINSTORM — drop Feature Ticket rain ──────────────────────────
+    boss.onStateEnter("brainstorm", () => {
+      let dropped = 0;
+      const dropHandle = k.loop(0.45, () => {
+        const tx = boss.pos.x + k.rand(-70, 70);
+        k.add([
+          k.sprite("ticket"),
+          k.pos(tx, boss.pos.y + 36),
+          k.area({ scale: 0.8 }),
+          k.body(),
+          k.anchor("center"),
+          k.scale(2.5),
+          k.z(7),
+          k.lifespan(5, { fade: 0.5 }),
+          "hazard", "ticket",
+        ]);
+        dropped++;
+        if (dropped >= 6) {
+          dropHandle.cancel();
+          boss.enterState("slam");
+        }
+      });
+    });
+
+    boss.onStateUpdate("brainstorm", () => {
+      boss.pos.y = HOVER_Y + Math.sin(k.time() * 3) * 6;
+    });
+
+    // ── STATE: SLAM — warning shake then ground-plunge ────────────────────────
+    boss.onStateEnter("slam", async () => {
+      // Red tint warning
+      boss.color = k.rgb(255, 100, 100);
+      // 5-tick horizontal judder
+      for (let i = 0; i < 5; i++) {
+        boss.pos.x += k.rand(-18, 18);
+        await k.wait(0.08);
+      }
+      boss.color = k.rgb(255, 255, 255);
+      // Plunge
+      await k.tween(boss.pos.y, SLAM_Y, 0.18,
+        (v) => { boss.pos.y = v; }, k.easings.easeInQuad);
+      k.shake(6);
+      boss.enterState("stunned");
+    });
+
+    // ── STATE: STUNNED — on ground, fully damageable ──────────────────────────
+    boss.onStateEnter("stunned", async () => {
+      boss.use(k.sprite("boss_cthulhu_stun"));
+      boss.color = k.rgb(255, 255, 255);
+      popup(boss.pos, "VULNERABLE!", [120, 255, 180]);
+      await k.wait(3.0);
+      // Rise back to hover altitude
+      await k.tween(boss.pos.y, HOVER_Y, 0.9,
+        (v) => { boss.pos.y = v; }, k.easings.easeOutQuad);
+      boss.enterState("hover");
+    });
+
+    boss.onStateUpdate("stunned", () => {
+      // Slight wobble while sitting stunned
+      boss.pos.x += Math.sin(k.time() * 12) * 0.4;
+    });
+
+    boss.onDeath(() => {
+      bossRef = null;
+      killReward(boss, 1000 + idx * 300);
+      onBossDefeated();
+    });
+  }
+
   function spawnBoss() {
     // ARCH-294: Layer 7 routes to the custom Final Boss instead of the
     // generic spawnBoss factory (which has no mutation cycle or ADM gate).
     if (idx === 6) return spawnFinalBoss();
+    // BOSS-101: Layer 1 uses the state-machine Cthulhu instead of the generic boss.
+    if (idx === 0) return spawnCthulhuBoss();
     const e = k.add([
       k.sprite(bossCfg.sprite), k.pos(Math.min(LW - 160, archie.pos.x + 380), 240),
       k.area(), k.anchor("center"), k.scale(SCALE * bossCfg.mult), k.z(8),
@@ -4791,6 +4914,12 @@ k.scene("level", (data: { idx: number; score: number }) => {
     // ARCH-259: Shapeshifter is invulnerable during its 1s transform window.
     if (e.is("shapeshifter") && k.time() < e.transformingUntil) {
       popup(e.pos, "TRANSFORMING — INVULNERABLE", [255, 220, 100]);
+      return;
+    }
+    // BOSS-101: Cthulhu is only damageable while in "stunned" (on the ground).
+    // Any hit in hover/brainstorm/slam gets deflected with a taunt popup.
+    if (e.is("cthulhu") && e.curState() !== "stunned" && !blessed) {
+      popup(e.pos, "WAIT FOR THE SLAM!", [200, 150, 255]);
       return;
     }
     // ARCH-296: Final Boss is INVULNERABLE unless the ADM A→H cycle has just
