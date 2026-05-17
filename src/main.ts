@@ -3819,7 +3819,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
     // ARCH-420: whack and shield override all other frames (highest priority).
     if (whackPhase === "wind") {
       nextFrame = "archie_whack_wind";
-      const p = Math.min(1, (k.time() - (whackSwingT - 0.16)) / 0.16);
+      const p = Math.min(1, (k.time() - (whackSwingT - 0.20)) / 0.20);
       sx = ARCHIE_SCALE * (1 - p * 0.08);
       sy = ARCHIE_SCALE * (1 + p * 0.12);
     } else if (whackPhase === "swing") {
@@ -3943,16 +3943,11 @@ k.scene("level", (data: { idx: number; score: number }) => {
   // ==========================================================================
   function doWhack() {
     if (whackPhase !== "none" || archie.frozen || shielding) return;
-    if (archie.cognitiveLoad < 0.05) {
-      popup(archie.pos, "TOO TIRED TO WHACK", [180, 180, 220]);
-      return;
-    }
-    archie.buildLoad(0.12); // small cost
     whackPhase = "wind";
-    whackSwingT = k.time() + 0.16;
-    whackEndT   = k.time() + 0.36;
-    // Wind-up phase → swing phase after 0.16s
-    k.wait(0.16, () => {
+    whackSwingT = k.time() + 0.20;
+    whackEndT   = k.time() + 0.45;
+    // Wind-up phase → swing phase after 0.20s
+    k.wait(0.20, () => {
       if (whackPhase !== "wind") return;
       whackPhase = "swing";
       // Arc trail — 4 additive cyan circles fanning from Archie's right
@@ -3997,7 +3992,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
       });
     });
     // Return to idle after full animation
-    k.wait(0.36, () => {
+    k.wait(0.45, () => {
       if (whackPhase !== "swing") return;
       whackPhase = "none";
     });
@@ -4011,10 +4006,6 @@ k.scene("level", (data: { idx: number; score: number }) => {
   // ==========================================================================
   function startShield() {
     if (shielding || whackPhase !== "none" || archie.frozen) return;
-    if (archie.cognitiveLoad < 0.12) {
-      popup(archie.pos, "NO ENERGY TO SHIELD", [180, 100, 100]);
-      return;
-    }
     shielding = true;
     // Spawn the cyan bubble entity (follows Archie in onUpdate)
     shieldBubble = k.add([
@@ -6222,9 +6213,8 @@ k.scene("level", (data: { idx: number; score: number }) => {
     // ARCH-420: Shield — grant invulnerability while C is held, drain cogLoad,
     // slow movement, and track the bubble entity to Archie's position.
     if (shielding) {
-      // Consume cognitive load while shielding (~50% drain over 4 seconds)
+      // Shielding relieves stress — drains cognitive load (lowers enemy dmg mult)
       if (!archie.locked) archie.cognitiveLoad = Math.max(0, archie.cognitiveLoad - 0.25 * k.dt());
-      if (archie.cognitiveLoad <= 0) endShield(); // ran out of energy
       // Keep blessing refreshed each frame
       archie.blessedUntil = k.time() + 0.1;
       // Move the bubble to track Archie
@@ -6601,8 +6591,27 @@ k.scene("level", (data: { idx: number; score: number }) => {
         color: k.rgb(255, 120, 120), outline: { width: 2, color: k.rgb(16, 16, 24) },
       });
     }
+    // ARCH-420: whack cooldown pip + shield active indicator
+    if (whackPhase !== "none") {
+      k.drawText({
+        text: whackPhase === "wind" ? "⚡ WIND-UP" : "⚡ WHACK!",
+        size: 14, pos: k.vec2(k.width() / 2, k.height() - 40), anchor: "center",
+        color: k.rgb(85, 193, 233),
+        outline: { width: 2, color: k.rgb(16, 16, 24) },
+      });
+    }
+    if (shielding) {
+      k.drawRect({ pos: k.vec2(k.width() / 2 - 90, k.height() - 54), width: 180, height: 22,
+        color: k.rgb(20, 60, 90), radius: 4 });
+      k.drawText({
+        text: "▣  BLUEPRINT SHIELD  ▣",
+        size: 13, pos: k.vec2(k.width() / 2, k.height() - 50), anchor: "center",
+        color: k.rgb(85, 193, 233),
+        outline: { width: 2, color: k.rgb(16, 16, 24) },
+      });
+    }
     k.drawText({
-      text: "ARROWS: MOVE/JUMP   SPACE: ATTACK (hold for Wand)   1/2/3: WEAPON",
+      text: "← → MOVE   ↑ JUMP   SPACE ATTACK   1/2/3 WEAPON   X WHACK   C SHIELD",
       size: 12, pos: k.vec2(16, k.height() - 22), color: k.rgb(150, 150, 160),
     });
   });
