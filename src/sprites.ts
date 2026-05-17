@@ -100,6 +100,105 @@ export const archie_drink_pose = wrapSVG(`
   <rect x="9" y="15" width="3" height="1" fill="#000"/>
 `);
 
+// =============================================================================
+// ARCH-420: WHACK / SHIELD sprite set — implementing the dual-mode blueprint
+// design from the spritesheet (image_3.png). All frames share the standard
+// ARCHIE_HEAD_TORSO block; only the arm/weapon pixels differ.
+// =============================================================================
+
+// ARCHIE — Whack wind-up. Blueprint rolled like a bat, raised over right
+// shoulder at diagonal. Body weight shifted back, left leg planted.
+export const archie_whack_wind = wrapSVG(`
+  ${ARCHIE_HEAD_TORSO}
+  <!-- Right arm raised -->
+  <rect x="11" y="11" width="2" height="2" fill="#FAD7A1"/>
+  <!-- Rolled blueprint (bat) held at shoulder, diagonal: top-right to mid -->
+  <rect x="13" y="3"  width="2" height="2" fill="#1A5276"/>
+  <rect x="13" y="5"  width="2" height="2" fill="#2E86C1"/>
+  <rect x="12" y="7"  width="2" height="2" fill="#2E86C1"/>
+  <rect x="12" y="9"  width="2" height="2" fill="#3498DB"/>
+  <rect x="12" y="9"  width="3" height="1" fill="#AED6F1"/>
+  <!-- Tape band -->
+  <rect x="12" y="11" width="3" height="1" fill="#FDFEFE"/>
+  <!-- Weight-back: left foot back, right forward -->
+  <rect x="3" y="14"  width="3" height="2" fill="#5D6D7E"/>
+  <rect x="10" y="14" width="3" height="2" fill="#5D6D7E"/>
+  <rect x="3" y="15"  width="3" height="1" fill="#000"/>
+  <rect x="10" y="15" width="3" height="1" fill="#000"/>
+`);
+
+// ARCHIE — Whack mid-swing. Blueprint extended forward-right horizontally.
+// Trailing arc effect is drawn in Kaboom (separate additive circles/particles).
+export const archie_whack_swing = wrapSVG(`
+  ${ARCHIE_HEAD_TORSO}
+  <!-- Right arm extended -->
+  <rect x="11" y="12" width="2" height="2" fill="#FAD7A1"/>
+  <!-- Rolled blueprint horizontal, sweeping right -->
+  <rect x="11" y="10" width="5" height="2" fill="#2E86C1"/>
+  <rect x="11" y="10" width="5" height="1" fill="#AED6F1"/>
+  <rect x="13" y="10" width="1" height="2" fill="#FDFEFE"/>
+  <!-- Cyan impact flash pixel at tip -->
+  <rect x="15" y="9"  width="1" height="4" fill="#85C1E9"/>
+  <!-- Legs braced wide for momentum -->
+  <rect x="2" y="14"  width="4" height="2" fill="#5D6D7E"/>
+  <rect x="10" y="14" width="4" height="2" fill="#5D6D7E"/>
+  <rect x="2" y="15"  width="4" height="1" fill="#000"/>
+  <rect x="10" y="15" width="4" height="1" fill="#000"/>
+`);
+
+// ARCHIE — Shield hold. Unrolled blueprint raised like a panel in front.
+// The large cyan diagram panel sits left-of-body; the Kaboom scene adds the
+// protective bubble circle on top (drawn in spawnShieldBubble()).
+export const archie_shield = wrapSVG(`
+  ${ARCHIE_HEAD_TORSO}
+  <!-- Blueprint panel (unrolled, held left-forward): cyan background -->
+  <rect x="0" y="3"  width="5" height="12" fill="#1A5276"/>
+  <rect x="0" y="3"  width="4" height="12" fill="#2471A3"/>
+  <!-- Diagram lines: horizontal rails -->
+  <rect x="1" y="5"  width="3" height="1" fill="#5DADE2"/>
+  <rect x="1" y="8"  width="3" height="1" fill="#5DADE2"/>
+  <rect x="1" y="11" width="3" height="1" fill="#5DADE2"/>
+  <!-- Diagram nodes: tiny white dots -->
+  <rect x="1" y="6"  width="1" height="1" fill="#AED6F1"/>
+  <rect x="3" y="6"  width="1" height="1" fill="#AED6F1"/>
+  <rect x="2" y="9"  width="1" height="1" fill="#AED6F1"/>
+  <rect x="1" y="12" width="1" height="1" fill="#AED6F1"/>
+  <rect x="3" y="12" width="1" height="1" fill="#AED6F1"/>
+  <!-- Vertical connector -->
+  <rect x="2" y="6"  width="1" height="3" fill="#5DADE2"/>
+  <!-- Left arm holding the panel -->
+  <rect x="4" y="11" width="2" height="2" fill="#FAD7A1"/>
+  <!-- Legs: standing firm -->
+  <rect x="4" y="14"  width="3" height="2" fill="#5D6D7E"/>
+  <rect x="9" y="14"  width="3" height="2" fill="#5D6D7E"/>
+  <rect x="4" y="15"  width="3" height="1" fill="#000"/>
+  <rect x="9" y="15"  width="3" height="1" fill="#000"/>
+`);
+
+// ARCHIE — Damage / knocked-back pose. Hat tilted, body angled, eyes wide,
+// legs flying apart. Used when Archie takes a heavy hit.
+export const archie_damage = wrapSVG(`
+  <!-- Hat (tilted right) -->
+  <rect x="5" y="0"  width="8" height="3" fill="#E74C3C"/>
+  <rect x="4" y="3"  width="10" height="2" fill="#E74C3C"/>
+  <!-- Wide eyes (shock) -->
+  <rect x="5" y="7"  width="6" height="4" fill="#FAD7A1"/>
+  <rect x="5" y="8"  width="2" height="2" fill="#000"/>
+  <rect x="9" y="8"  width="2" height="2" fill="#000"/>
+  <!-- Body angled -->
+  <rect x="4" y="11" width="8" height="2" fill="#5D6D7E"/>
+  <rect x="6" y="11" width="2" height="2" fill="#FFFFFF"/>
+  <rect x="6" y="12" width="2" height="1" fill="#E74C3C"/>
+  <!-- Arms flying out -->
+  <rect x="1" y="10" width="3" height="2" fill="#E74C3C"/>
+  <rect x="12" y="10" width="3" height="2" fill="#E74C3C"/>
+  <!-- Legs splayed wide -->
+  <rect x="2" y="13"  width="3" height="3" fill="#5D6D7E"/>
+  <rect x="11" y="13" width="3" height="3" fill="#5D6D7E"/>
+  <rect x="1" y="15"  width="4" height="1" fill="#000"/>
+  <rect x="11" y="15" width="4" height="1" fill="#000"/>
+`);
+
 // SCOPE CREEP — green amorphous blob.
 export const scope_creep = wrapSVG(`
   <rect x="3" y="6" width="10" height="10" fill="#229954"/>

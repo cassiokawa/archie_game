@@ -9,6 +9,7 @@ import kaboom from "kaboom";
 import {
   archie_idle, archie_run_a, archie_run_b, archie_jump_pose,
   archie_fall_pose, archie_drink_pose,
+  archie_whack_wind, archie_whack_swing, archie_shield, archie_damage,
   scope_creep, weapon_blueprint, weapon_hammer, coffee_bean, ground_tile,
   coffee_cup, weapon_wand, trap_misplacement, item_shield,
   boss_cthulhu_idle, boss_cthulhu_stun, projectile_ticket,
@@ -2384,6 +2385,11 @@ k.loadSprite("archie_run_b", archie_run_b);
 k.loadSprite("archie_jump", archie_jump_pose);
 k.loadSprite("archie_fall", archie_fall_pose);
 k.loadSprite("archie_drink", archie_drink_pose);
+// ARCH-420: whack & shield pose frames
+k.loadSprite("archie_whack_wind",  archie_whack_wind);
+k.loadSprite("archie_whack_swing", archie_whack_swing);
+k.loadSprite("archie_shield",      archie_shield);
+k.loadSprite("archie_damage",      archie_damage);
 k.loadSprite("creep", scope_creep);
 k.loadSprite("scopecreep", scope_creep); // override the canvas-baked one
 k.loadSprite("blueprint", weapon_blueprint);
@@ -3791,6 +3797,13 @@ k.scene("level", (data: { idx: number; score: number }) => {
   let archieMode: "suit" | "tux" = "suit";
   let currentArchieFrame = "archie"; // kept for espresso afterimage spawning
   let runAnimT = 0;
+  // ARCH-420: dual-mode blueprint — whack (X) and shield (C-hold)
+  let whackPhase: "none" | "wind" | "swing" = "none";
+  let whackEndT = 0;       // k.time() when the full whack animation ends
+  let whackSwingT = 0;     // k.time() when swing phase starts
+  let shielding = false;   // true while C is held
+  let damagedFlashUntil = 0; // k.time() when red-damage flash frame expires
+  let shieldBubble: any = null; // live bubble entity so we can destroy it
   // ARCH-315: dual-channel animation — SVG sprite swap AND scale squash/stretch
   // stack on top of each other for maximum readability. State priority:
   //   drinking (archie_drink) → in-air (archie_jump rising / archie_fall falling)
@@ -3803,7 +3816,28 @@ k.scene("level", (data: { idx: number; score: number }) => {
     const drinking = k.time() < archie.drinkingUntil;
     const grounded = archie.isGrounded();
     const walking = k.isKeyDown("left") || k.isKeyDown("right");
-    if (drinking) {
+    // ARCH-420: whack and shield override all other frames (highest priority).
+    if (whackPhase === "wind") {
+      nextFrame = "archie_whack_wind";
+      const p = Math.min(1, (k.time() - (whackSwingT - 0.16)) / 0.16);
+      sx = ARCHIE_SCALE * (1 - p * 0.08);
+      sy = ARCHIE_SCALE * (1 + p * 0.12);
+    } else if (whackPhase === "swing") {
+      nextFrame = "archie_whack_swing";
+      // Forward lunge squash
+      sx = ARCHIE_SCALE * 1.12;
+      sy = ARCHIE_SCALE * 0.9;
+    } else if (shielding) {
+      nextFrame = "archie_shield";
+      // Subtle shield breathe
+      const b = Math.sin(k.time() * 4) * 0.015;
+      sx = ARCHIE_SCALE * (1 + b);
+      sy = ARCHIE_SCALE * (1 - b);
+    } else if (k.time() < damagedFlashUntil) {
+      nextFrame = "archie_damage";
+      sx = ARCHIE_SCALE * 1.1;
+      sy = ARCHIE_SCALE * 0.9;
+    } else if (drinking) {
       // Quick pulse for the sip
       const p = (archie.drinkingUntil - k.time()) / 0.55;
       const pulse = Math.sin((1 - p) * Math.PI) * 0.12;
@@ -3861,7 +3895,9 @@ k.scene("level", (data: { idx: number; score: number }) => {
 
   function walk(sign: 1 | -1) {
     if (archie.frozen) return;
-    const speed = k.time() < archie.espressoUntil ? SPEED * 1.8 : SPEED;
+    if (whackPhase === "swing") return; // locked during swing
+    const shieldSlow = shielding ? 0.38 : 1.0;
+    const speed = (k.time() < archie.espressoUntil ? SPEED * 1.8 : SPEED) * shieldSlow;
     // ARCH-154: Release Demon contact inverts controls for 5s.
     const dir = (archie.controlsInverted ? -sign : sign) as 1 | -1;
     archie.move(speed * dir, 0);
@@ -3898,6 +3934,117 @@ k.scene("level", (data: { idx: number; score: number }) => {
   k.onKeyPress("1", () => switchWeapon(0));
   k.onKeyPress("2", () => switchWeapon(1));
   k.onKeyPress("3", () => switchWeapon(2));
+
+  // ==========================================================================
+  // ARCH-420: WHACK ATTACK (X key) — Archie swings the rolled blueprint like
+  // a bat. Short-range melee with a 3-step animation: wind (0.16s) → swing
+  // (0.20s) → recover. A temporary hitbox fires at the peak of the swing.
+  // The arc trail is drawn with additive Kaboom circles.
+  // ==========================================================================
+  function doWhack() {
+    if (whackPhase !== "none" || archie.frozen || shielding) return;
+    if (archie.cognitiveLoad < 0.05) {
+      popup(archie.pos, "TOO TIRED TO WHACK", [180, 180, 220]);
+      return;
+    }
+    archie.buildLoad(0.12); // small cost
+    whackPhase = "wind";
+    whackSwingT = k.time() + 0.16;
+    whackEndT   = k.time() + 0.36;
+    // Wind-up phase → swing phase after 0.16s
+    k.wait(0.16, () => {
+      if (whackPhase !== "wind") return;
+      whackPhase = "swing";
+      // Arc trail — 4 additive cyan circles fanning from Archie's right
+      for (let i = 0; i < 4; i++) {
+        const ang = (archie.facing > 0 ? -0.4 : Math.PI + 0.4) + i * 0.28;
+        const r   = 32 + i * 14;
+        k.add([
+          k.circle(8 - i), k.anchor("center"),
+          k.pos(archie.pos.x + Math.cos(ang) * r, archie.pos.y + Math.sin(ang) * r - 8),
+          k.color(85, 193, 233), k.opacity(0.85 - i * 0.18),
+          k.lifespan(0.18, { fade: 0.14 }), k.z(15),
+        ]);
+      }
+      // Impact flash line
+      k.add([
+        k.rect(50, 3), k.anchor("left"),
+        k.pos(archie.pos.x + archie.facing * 8, archie.pos.y - 6),
+        k.color(180, 240, 255), k.opacity(0.9),
+        k.lifespan(0.1, { fade: 0.08 }), k.z(15),
+      ]);
+      // Temporary hitbox — lasts 0.16s, damages all enemies in reach
+      const hitbox = k.add([
+        k.rect(52, 36), k.anchor("left"),
+        k.pos(archie.pos.x + archie.facing * 8, archie.pos.y - 20),
+        k.area(), k.z(12), k.opacity(0),
+        k.lifespan(0.16), "whack_hitbox",
+      ]);
+      // Flip hitbox left if facing left
+      if (archie.facing < 0) {
+        hitbox.anchor = "right";
+        hitbox.pos.x  = archie.pos.x - 8;
+      }
+      k.onCollide("whack_hitbox", "enemy", (h: any, e: any) => {
+        if (!e.exists()) return;
+        const dmg = Math.max(1, Math.round(WEAPONS[0].dmg * archie.dmgMult() * 1.5));
+        e.hurt(dmg);
+        popup(e.pos, `WHACK! -${dmg}`, [85, 193, 233]);
+        k.addKaboom(e.pos, { scale: 0.4 });
+        // Knockback
+        const kb = archie.facing * 180;
+        if (e.move) e.move(kb, -120);
+      });
+    });
+    // Return to idle after full animation
+    k.wait(0.36, () => {
+      if (whackPhase !== "swing") return;
+      whackPhase = "none";
+    });
+  }
+  k.onKeyPress("x", () => doWhack());
+
+  // ==========================================================================
+  // ARCH-420: SHIELD MODE (C hold) — Archie raises the unrolled blueprint.
+  // Grants invulnerability, halves movement speed, drains cognitiveLoad.
+  // A cyan bubble entity (shieldBubble) is rendered around the blueprint.
+  // ==========================================================================
+  function startShield() {
+    if (shielding || whackPhase !== "none" || archie.frozen) return;
+    if (archie.cognitiveLoad < 0.12) {
+      popup(archie.pos, "NO ENERGY TO SHIELD", [180, 100, 100]);
+      return;
+    }
+    shielding = true;
+    // Spawn the cyan bubble entity (follows Archie in onUpdate)
+    shieldBubble = k.add([
+      k.circle(52), k.anchor("center"),
+      k.pos(archie.pos.x - archie.facing * 20, archie.pos.y - 4),
+      k.color(85, 193, 233), k.opacity(0.22), k.z(9),
+    ]);
+    // Outer glow ring
+    const glow = k.add([
+      k.circle(58), k.anchor("center"),
+      k.pos(archie.pos.x - archie.facing * 20, archie.pos.y - 4),
+      k.color(150, 220, 255), k.opacity(0.10), k.z(8),
+    ]);
+    shieldBubble._glow = glow;
+    popup(archie.pos, "BLUEPRINT SHIELD", [85, 193, 233]);
+  }
+  function endShield() {
+    if (!shielding) return;
+    shielding = false;
+    if (shieldBubble && shieldBubble.exists()) {
+      if (shieldBubble._glow && shieldBubble._glow.exists()) k.destroy(shieldBubble._glow);
+      k.destroy(shieldBubble);
+    }
+    shieldBubble = null;
+  }
+  k.onKeyDown("c", () => startShield());
+  k.onKeyRelease("c", () => endShield());
+
+  // ARCH-420: ARCHIE onUpdate additions for whack/shield.
+  // (Appended to the existing archie.onUpdate block later via the main hook.)
 
   // ARCH-142: BLUEPRINT BARRIER — Weapon 1 no longer swings; per the mockup it
   // "unrolls" into a stationary cyan grid in front of Archie. The barrier
@@ -4109,6 +4256,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
     if (k.time() < archie.blessedUntil) return;
     if (k.time() < invulnUntil) return;
     invulnUntil = k.time() + 1.0;
+    damagedFlashUntil = k.time() + 0.45; // show knocked-back sprite briefly
     let amt = halves;
     if (k.time() < archie.exposedUntil) amt *= 2;
     coffeeHalves -= amt;
@@ -6071,6 +6219,26 @@ k.scene("level", (data: { idx: number; score: number }) => {
     // ARCH-144: drive the animation state machine each frame.
     updateArchieSprite();
 
+    // ARCH-420: Shield — grant invulnerability while C is held, drain cogLoad,
+    // slow movement, and track the bubble entity to Archie's position.
+    if (shielding) {
+      // Consume cognitive load while shielding (~50% drain over 4 seconds)
+      if (!archie.locked) archie.cognitiveLoad = Math.max(0, archie.cognitiveLoad - 0.25 * k.dt());
+      if (archie.cognitiveLoad <= 0) endShield(); // ran out of energy
+      // Keep blessing refreshed each frame
+      archie.blessedUntil = k.time() + 0.1;
+      // Move the bubble to track Archie
+      if (shieldBubble && shieldBubble.exists()) {
+        const bubbleX = archie.pos.x - archie.facing * 20;
+        shieldBubble.pos = k.vec2(bubbleX, archie.pos.y - 4);
+        shieldBubble.opacity = 0.16 + Math.sin(k.time() * 6) * 0.06;
+        if (shieldBubble._glow && shieldBubble._glow.exists())
+          shieldBubble._glow.pos = k.vec2(bubbleX, archie.pos.y - 4);
+      }
+    }
+    // Whack: prevent movement during swing window
+    if (whackPhase !== "none") archie.frozen = false; // don't freeze, but restrict below
+
     const w = WEAPONS[weaponIdx];
     if (w.kind === "aoe" && k.isKeyDown("space") && !archie.frozen && archie.cognitiveLoad > 0) {
       if (!archie.locked) archie.cognitiveLoad = Math.max(0, archie.cognitiveLoad - 0.5 * k.dt());
@@ -6596,7 +6764,8 @@ k.scene("briefing", (data: { idx: number; score: number }) => {
   txt(R, 390,
     "← → Move     ↑ Jump (↑↑ = double jump)\n" +
     "SPACE Attack  1 / 2 / 3 Switch weapon\n" +
-    "SPACE (hold)  Hammer charge / Wand drain");
+    "SPACE (hold)  Hammer charge / Wand drain\n" +
+    "X  Whack (blueprint bat)   C (hold) Shield");
 
   // ── footer bar ─────────────────────────────────────────────────────────────
   k.add([k.rect(W, 38), k.pos(0, H - 38), k.color(...seg.sky), k.opacity(0.45)]);
