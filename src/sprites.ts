@@ -109,33 +109,29 @@ export const scope_creep = wrapSVG(`
   <rect x="5" y="13" width="6" height="1" fill="#145A32"/>
 `);
 
-// THE BLUEPRINT — rolled-up cyan schematic.
+// THE BLUEPRINT (BAT) — rolled-up cyan schematic, reinforced with white tape.
 export const weapon_blueprint = wrapSVG(`
-  <rect x="2" y="6" width="12" height="4" fill="#3498DB"/>
-  <rect x="1" y="5" width="2" height="6" fill="#2980B9"/>
-  <rect x="13" y="5" width="2" height="6" fill="#2980B9"/>
-  <rect x="4" y="7" width="8" height="1" fill="#EAF2F8"/>
-  <rect x="4" y="9" width="6" height="1" fill="#EAF2F8"/>
+  <rect x="12" y="2" width="2" height="12" fill="#2980B9"/>
+  <rect x="11" y="2" width="2" height="12" fill="#3498DB"/>
+  <rect x="11" y="8" width="3" height="2" fill="#FFF"/>
+  <rect x="11" y="3" width="3" height="1" fill="#BDC3C7"/>
 `);
 
-// REFACTORING HAMMER — gray steel head + brown wood handle.
+// REFACTORING HAMMER (MJOLNIR) — heavy grey head, short brown handle, blue spark.
 export const weapon_hammer = wrapSVG(`
-  <rect x="2" y="2" width="7" height="4" fill="#5D6D7E"/>
-  <rect x="2" y="2" width="7" height="1" fill="#FFFFFF"/>
-  <rect x="2" y="5" width="7" height="1" fill="#34495E"/>
-  <rect x="3" y="3" width="1" height="1" fill="#000"/>
-  <rect x="7" y="3" width="1" height="1" fill="#000"/>
-  <rect x="6" y="6" width="2" height="9" fill="#8B4513"/>
-  <rect x="6" y="6" width="1" height="9" fill="#A0522D"/>
+  <rect x="7" y="8" width="2" height="8" fill="#8B4513"/>
+  <rect x="6" y="15" width="4" height="1" fill="#7F8C8D"/>
+  <rect x="3" y="2" width="10" height="6" fill="#95A5A6"/>
+  <rect x="2" y="3" width="12" height="4" fill="#7F8C8D"/>
+  <rect x="4" y="2" width="8" height="6" fill="#BDC3C7"/>
+  <rect x="7" y="4" width="2" height="2" fill="#3498DB"/>
 `);
 
-// COFFEE BEAN — primary currency pickup.
+// COFFEE BEAN — primary currency pickup. Cute rounded bean with centre groove.
 export const coffee_bean = wrapSVG(`
-  <rect x="5" y="3" width="6" height="10" fill="#8B4513"/>
-  <rect x="5" y="3" width="6" height="2" fill="#A0522D"/>
-  <rect x="5" y="11" width="6" height="2" fill="#5C2E0B"/>
-  <rect x="7" y="3" width="2" height="10" fill="#3E2014"/>
-  <rect x="6" y="4" width="1" height="2" fill="#D2691E"/>
+  <rect x="4" y="3" width="8" height="10" fill="#8B4513" rx="4"/>
+  <rect x="7" y="4" width="2" height="8" fill="#3E2723"/>
+  <rect x="10" y="5" width="1" height="3" fill="#D2B48C"/>
 `);
 
 // AGILE TRENCH TILE — a shaky post-it note floor.
@@ -143,4 +139,40 @@ export const ground_tile = wrapSVG(`
   <rect x="0" y="0" width="16" height="16" fill="#F9E79F"/>
   <rect x="0" y="0" width="16" height="2" fill="#F1C40F"/>
   <rect x="14" y="0" width="2" height="16" fill="#D4AC0D"/>
+`);
+
+// COFFEE CUP — white mug with dark roast fill and steam wisps.
+export const coffee_cup = wrapSVG(`
+  <rect x="3" y="6" width="10" height="8" fill="#ECF0F1"/>
+  <rect x="13" y="8" width="2" height="4" fill="#ECF0F1"/>
+  <rect x="13" y="9" width="1" height="2" fill="#000"/>
+  <rect x="4" y="6" width="8" height="1" fill="#3E2723"/>
+  <rect x="5" y="2" width="1" height="2" fill="#BDC3C7"/>
+  <rect x="8" y="3" width="1" height="2" fill="#BDC3C7"/>
+  <rect x="11" y="1" width="1" height="2" fill="#BDC3C7"/>
+`);
+
+// ORCHESTRATOR WAND — magic stick with glowing gold star tip.
+export const weapon_wand = wrapSVG(`
+  <rect x="7" y="6" width="2" height="10" fill="#34495E"/>
+  <rect x="6" y="0" width="4" height="1" fill="#F1C40F"/>
+  <rect x="5" y="1" width="6" height="1" fill="#F1C40F"/>
+  <rect x="4" y="2" width="8" height="2" fill="#F1C40F"/>
+  <rect x="5" y="4" width="6" height="1" fill="#F1C40F"/>
+  <rect x="6" y="5" width="4" height="1" fill="#F1C40F"/>
+  <rect x="7" y="1" width="2" height="4" fill="#FFF"/>
+`);
+
+// MISPLACEMENT TRAP — angry corrupted yellow folder; damages Archie on contact.
+export const trap_misplacement = wrapSVG(`
+  <rect x="2" y="4" width="5" height="2" fill="#F39C12"/>
+  <rect x="1" y="6" width="14" height="9" fill="#F1C40F"/>
+  <rect x="4" y="8" width="2" height="1" fill="#E74C3C"/>
+  <rect x="10" y="8" width="2" height="1" fill="#E74C3C"/>
+  <rect x="5" y="9" width="1" height="1" fill="#000"/>
+  <rect x="10" y="9" width="1" height="1" fill="#000"/>
+  <rect x="5" y="11" width="1" height="1" fill="#000"/>
+  <rect x="6" y="12" width="4" height="1" fill="#000"/>
+  <rect x="10" y="11" width="1" height="1" fill="#000"/>
+  <rect x="12" y="12" width="2" height="2" fill="#E74C3C"/>
 `);

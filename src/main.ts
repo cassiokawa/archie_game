@@ -10,6 +10,7 @@ import {
   archie_idle, archie_run_a, archie_run_b, archie_jump_pose,
   archie_fall_pose, archie_drink_pose,
   scope_creep, weapon_blueprint, weapon_hammer, coffee_bean, ground_tile,
+  coffee_cup, weapon_wand, trap_misplacement,
 } from "./sprites";
 
 const k = kaboom({
@@ -2275,6 +2276,11 @@ k.loadSprite("bean1", coffee_bean); // alias so any leftover cycle refs stay val
 k.loadSprite("bean2", coffee_bean);
 k.loadSprite("ground", ground_tile);
 k.loadSprite("groundtile", ground_tile);
+k.loadSprite("cup_full", coffee_cup);   // SVG cup replaces canvas cup_full
+k.loadSprite("cup_half", coffee_cup);   // same visual; state shown via opacity
+k.loadSprite("cup_empty", coffee_cup);
+k.loadSprite("wand", weapon_wand);
+k.loadSprite("misplacement", trap_misplacement);
 
 k.scene("level", (data: { idx: number; score: number }) => {
   const idx = data.idx;
@@ -2303,8 +2309,8 @@ k.scene("level", (data: { idx: number; score: number }) => {
   // this timestamp. `admJustExposed` flashes the "VULNERABLE" banner briefly.
   let admStep = 0;
   let admVulnerableUntil = 0;
-  // ARCH-182: Caffeine Points — per-level currency. Beans give +5, JIRA +10.
-  // 50 buys the Funding key from the Layer 1 vendor.
+  // ARCH-182: Caffeine Points — per-level currency. Beans give +5 CP.
+  // 50 CP buys the Funding key from the Layer 1 vendor.
   let caffeinePoints = 0;
   let lastVendorPopup = 0;
   let bossRef: any = null;
@@ -3213,11 +3219,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
     }
     addPlatform(px, y, w, motion);
     if (k.rand() < 0.72) {
-      addCollectible(
-        k.rand() < 0.45 ? "jira" : "bean",
-        px + w / 2, y - 42,
-        k.rand() < 0.45 ? "jira" : "bean",
-      );
+      addCollectible("bean", px + w / 2, y - 42, "bean");
     }
     px += k.rand(140, 260);
   }
@@ -3233,7 +3235,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
         ? { axis: "x", range: k.rand(60, 120), speed: k.rand(0.9, 1.6) }
         : undefined;
     addPlatform(hx, hy, hw, hmotion);
-    addCollectible("jira", hx + hw / 2, hy - 42, "jira");
+    addCollectible("bean", hx + hw / 2, hy - 42, "bean");
   }
   // ARCH-216: ELEVATOR platforms — long-range slow vertical travel that
   // actually transports the player between the ground tier and the high-air
@@ -3255,9 +3257,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
   for (let i = 0; i < Math.round(playable / 220); i++) {
     addCollectible("bean", k.rand(220, bossGateX), GROUND_Y - 36, "bean");
   }
-  for (let i = 0; i < Math.round(playable / 700); i++) {
-    addCollectible("jira", k.rand(220, bossGateX), GROUND_Y - 36, "jira");
-  }
+  // Misplacement traps already placed above; no jira collectibles any more.
   addCollectible("armor", k.rand(320, bossGateX - 220), GROUND_Y - 40, "armor");
   if (playable > 2200) addCollectible("armor", k.rand(320, bossGateX - 220), GROUND_Y - 40, "armor");
   addCollectible("espresso", k.rand(320, bossGateX - 220), GROUND_Y - 40, "espresso");
@@ -3577,16 +3577,15 @@ k.scene("level", (data: { idx: number; score: number }) => {
     addZone(Math.round(LW * 0.58), "Inventory");
   }
 
-  // ARCH-148: JIRA ticket floor hazards — crumpled tickets on the pavement.
-  // Stepping on one is a P0 incident. Tagged "hazard" so the existing collide
-  // path handles damage. They persist for the whole level.
+  // ASSET-1138 / ARCH-148: Misplacement Traps — corrupted folders on the floor.
+  // Replace the old JIRA Swarm Hazard. Same "hazard" tag → same damage path.
   const hazardCount = Math.floor(playable / 520) + 2;
   for (let i = 0; i < hazardCount; i++) {
     const hx = k.rand(280, bossGateX - 80);
     k.add([
-      k.sprite("jirahazard"), k.pos(hx, GROUND_Y - 14),
+      k.sprite("misplacement"), k.pos(hx, GROUND_Y - 14),
       k.area(), k.anchor("center"), k.scale(SCALE), k.z(6),
-      "hazard", "jiraswarm",
+      "hazard", "misplacementtrap",
     ]);
   }
   // ARCH-150: 2 Bureaucratic Bottleneck Clouds drift through every level.
@@ -3612,41 +3611,16 @@ k.scene("level", (data: { idx: number; score: number }) => {
     const pulse = 1 + Math.sin(k.time() * 6 + b.pos.x * 0.05) * 0.08;
     b.scale = k.vec2(baseScale * pulse, baseScale * pulse);
   });
-  // ARCH-192: JIRA ticket animation — mostly static, with occasional flicker
-  // and scroll frames. Each ticket is desynced so the room reads as a chaotic
-  // CRT field of unresolved work, not a synchronized billboard.
-  const JIRA_FRAMES = [
-    "jira", "jira", "jira", "jira",
-    "jira_scroll1", "jira",
-    "jira", "jira_flicker",
-    "jira", "jira_scroll2",
-    "jira", "jira", "jira",
-  ];
-  k.onUpdate("jira", (b: any) => {
-    b.pos.y = b.bob + Math.sin(k.time() * 3 + b.pos.x) * 5;
-    if (b.frameIdx === undefined) b.frameIdx = Math.floor(b.pos.x) % JIRA_FRAMES.length;
-    b.frameT = (b.frameT ?? 0) + k.dt();
-    if (b.frameT > 0.22) {
-      b.frameT = 0;
-      b.frameIdx = (b.frameIdx + 1) % JIRA_FRAMES.length;
-      b.use(k.sprite(JIRA_FRAMES[b.frameIdx]));
-    }
-  });
-  // ARCH-196: JIRA Swarm Hazard flicker — slower cycle than individual tickets
-  // (the floor swarm is many tickets at once, so it just glitches in place).
-  const SWARM_FRAMES = [
-    "jirahazard", "jirahazard", "jirahazard",
-    "jirahazard_shift", "jirahazard",
-    "jirahazard_dim", "jirahazard", "jirahazard",
-  ];
-  k.onUpdate("jiraswarm", (h: any) => {
-    if (h.frameIdx === undefined) h.frameIdx = Math.floor(h.pos.x) % SWARM_FRAMES.length;
-    h.frameT = (h.frameT ?? 0) + k.dt();
-    if (h.frameT > 0.28) {
-      h.frameT = 0;
-      h.frameIdx = (h.frameIdx + 1) % SWARM_FRAMES.length;
-      h.use(k.sprite(SWARM_FRAMES[h.frameIdx]));
-    }
+  // ASSET-1138: Misplacement Trap pulse — angry folder breathes with a red
+  // tint flicker to signal danger. Scale-based, no multi-frame sprites needed.
+  k.onUpdate("misplacementtrap", (h: any) => {
+    const t = k.time() + (h.pos?.x ?? 0) * 0.03;
+    const pulse = 1 + Math.sin(t * 5) * 0.05;
+    const baseScale = h.baseScale ?? (h.baseScale = h.scale?.x ?? SCALE);
+    h.scale = k.vec2(baseScale * pulse, baseScale * pulse);
+    // Flash red every ~0.9s
+    const angry = Math.sin(t * 3.5) > 0.7;
+    h.color = angry ? k.rgb(255, 160, 160) : k.rgb(255, 255, 255);
   });
   k.onUpdate("armor", (b: any) => { b.pos.y = b.bob + Math.sin(k.time() * 5 + b.pos.x) * 4; });
   k.onUpdate("espresso", (b: any) => { b.pos.y = b.bob + Math.sin(k.time() * 5 + b.pos.x) * 4; });
@@ -5081,17 +5055,8 @@ k.scene("level", (data: { idx: number; score: number }) => {
     playDrink(0.08); // small sip — brief recharge
     k.destroy(b);
   });
-  archie.onCollide("jira", (b: any) => {
-    if (!b.exists()) return;
-    // ARCH-185: JIRA tickets are the ALTERNATIVE currency — score + CP + load.
-    // The cognitive recharge here happens via playDrink (consistent feedback);
-    // the buildLoad arg already accounts for the bigger context kick.
-    score += 75; caffeinePoints += 10;
-    popup(b.pos, "+CONTEXT (+10 CP)", [255, 120, 120]);
-    goldenBurst(b.pos);
-    playDrink(0.30);
-    k.destroy(b);
-  });
+  // ASSET-1138: jira collectibles retired — replaced by misplacement traps.
+  // Beans are now the sole currency pickup (coffee_bean SVG).
   // ARCH-186: Funding Vendor — buy the Approved Funding key with 50 CP.
   archie.onCollide("vendor", (v: any) => {
     if (!v.exists()) return;
