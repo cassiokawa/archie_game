@@ -4918,7 +4918,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
     }
     // BOSS-101: Cthulhu is only damageable while in "stunned" (on the ground).
     // Any hit in hover/brainstorm/slam gets deflected with a taunt popup.
-    if (e.is("cthulhu") && e.curState() !== "stunned" && !blessed) {
+    if (e.is("cthulhu") && e.state !== "stunned" && !blessed) {
       popup(e.pos, "WAIT FOR THE SLAM!", [200, 150, 255]);
       return;
     }
