@@ -5051,8 +5051,20 @@ k.scene("level", (data: { idx: number; score: number }) => {
       boss.pos.y = HOVER_Y + Math.sin(k.time() * 3) * 6;
     });
 
-    // ── STATE: SLAM — warning judder + 3-clone plunge (only 1 is real) ────────
+    // ── STATE: SLAM — judder → 3-clone shuffle with PM buzzwords → AOE slam ────
     boss.onStateEnter("slam", async () => {
+      const BUZZWORDS = [
+        "SYNERGIZE!", "CIRCLE BACK!", "MOVE THE NEEDLE!", "LEVERAGE!",
+        "LOW-HANGING FRUIT!", "PARADIGM SHIFT!", "DEEP DIVE!", "BANDWIDTH!",
+        "TOUCH BASE!", "PIVOT!", "UNPACK!", "DISRUPTIVE!", "IDEATE!",
+        "ALIGNMENT!", "HOLISTIC!", "AGILE!", "ITERATE!", "BOIL THE OCEAN!",
+        "STAKEHOLDER BUY-IN!", "ACTION ITEMS!", "DOUBLE-CLICK ON THAT!",
+        "TAKE THIS OFFLINE!", "LET'S PARK THAT!", "AT THE END OF THE DAY!",
+        "VALUE-ADD!", "THOUGHT LEADERSHIP!", "CORE COMPETENCY!", "SCALABLE!",
+      ];
+      const buzzword = () =>
+        BUZZWORDS[Math.floor(k.rand(0, BUZZWORDS.length))];
+
       // Red tint + 5-tick horizontal judder as warning
       boss.color = k.rgb(255, 100, 100);
       for (let i = 0; i < 5; i++) {
@@ -5061,24 +5073,27 @@ k.scene("level", (data: { idx: number; score: number }) => {
       }
       boss.color = k.rgb(255, 255, 255);
 
-      // Three X positions spread across the arena — shuffle so real one is random
-      const thirds = [
+      // Three fixed lane X positions across the arena
+      const lanes = [
         ARENA_LEFT  + (ARENA_RIGHT - ARENA_LEFT) * 0.18,
         ARENA_MID,
         ARENA_RIGHT - (ARENA_RIGHT - ARENA_LEFT) * 0.18,
       ];
-      // Fisher-Yates shuffle with kaboom rand
-      for (let i = 2; i > 0; i--) {
-        const j = Math.floor(k.rand(0, i + 1));
-        const tmp = thirds[i]; thirds[i] = thirds[j]; thirds[j] = tmp;
-      }
 
-      // Real boss snaps to thirds[0] — player can't know which one
-      boss.pos.x = thirds[0];
+      // Assign boss to a random lane to start
+      const initShuffle = (arr: number[]) => {
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(k.rand(0, i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+      };
+      initShuffle(lanes);
+
+      boss.pos.x = lanes[0];
       boss.pos.y = HOVER_Y;
 
-      // Spawn 2 ghost decoys at the other two positions — identical look
-      const decoys = [thirds[1], thirds[2]].map(dx => k.add([
+      // Spawn 2 ghost decoys — identical look, impossible to tell apart
+      const decoys = [lanes[1], lanes[2]].map(dx => k.add([
         k.sprite("boss_cthulhu_idle"),
         k.pos(dx, HOVER_Y),
         k.anchor("center"),
@@ -5089,22 +5104,109 @@ k.scene("level", (data: { idx: number; score: number }) => {
         "cthulhu_decoy",
       ]));
 
-      // All three plunge simultaneously — player must pick the real landing spot
+      const allEntities = [boss as any, ...decoys];
+
+      // ── SWAP PHASE — entities shuffle lanes 3-5 times with PM buzzwords ──────
+      const SWAP_ROUNDS = Math.floor(k.rand(3, 6));
+      for (let round = 0; round < SWAP_ROUNDS; round++) {
+        if (!boss.exists()) break;
+
+        // New shuffled lane assignment
+        const order = [0, 1, 2];
+        for (let i = 2; i > 0; i--) {
+          const j = Math.floor(k.rand(0, i + 1));
+          [order[i], order[j]] = [order[j], order[i]];
+        }
+
+        // Tween each entity to its new lane + spray a PM buzzword above it
+        for (let ei = 0; ei < 3; ei++) {
+          const ent = allEntities[ei];
+          if (!ent.exists()) continue;
+          const targetX = lanes[order[ei]];
+
+          k.add([
+            k.text(buzzword(), { size: 11 }),
+            k.pos(ent.pos.x, ent.pos.y - 68),
+            k.anchor("center"),
+            k.color(255, 220, 80),
+            k.outline(2, k.rgb(16, 16, 24)),
+            k.z(25),
+            k.lifespan(0.5, { fade: 0.25 }),
+          ]);
+
+          k.tween(ent.pos.x, targetX, 0.42,
+            (v) => { if (ent.exists()) ent.pos.x = v; },
+            k.easings.easeInOutSine);
+        }
+
+        await k.wait(0.52);
+      }
+
+      if (!boss.exists()) {
+        decoys.forEach(d => { if (d.exists()) k.destroy(d); });
+        return;
+      }
+
+      // ── FINAL PLUNGE — all three drop simultaneously ──────────────────────────
       for (const d of decoys) {
-        k.tween(d.pos.y, SLAM_Y, 0.18,
+        if (d.exists()) k.tween(d.pos.y, SLAM_Y, 0.18,
           (v) => { if (d.exists()) d.pos.y = v; }, k.easings.easeInQuad);
       }
       await k.tween(boss.pos.y, SLAM_Y, 0.18,
         (v) => { boss.pos.y = v; }, k.easings.easeInQuad);
 
-      k.shake(8);
+      k.shake(10);
 
-      // Decoys burst and vanish — revealing the real boss on the ground
+      // Decoys burst and vanish
       for (const d of decoys) {
         if (!d.exists()) continue;
         k.addKaboom(d.pos, { scale: 0.9 });
         k.destroy(d);
       }
+
+      // ── AOE EXPLOSION — shockwave rings + damage in radius ───────────────────
+      const AOE_R = 190;
+      // Outer shockwave (orange)
+      k.add([
+        k.circle(AOE_R), k.pos(boss.pos), k.anchor("center"),
+        k.color(255, 100, 40), k.opacity(0.55), k.z(15),
+        k.lifespan(0.35, { fade: 0.30 }),
+      ]);
+      // Mid ring (yellow)
+      k.add([
+        k.circle(AOE_R * 0.6), k.pos(boss.pos), k.anchor("center"),
+        k.color(255, 200, 60), k.opacity(0.72), k.z(16),
+        k.lifespan(0.22, { fade: 0.18 }),
+      ]);
+      // Core flash (white)
+      k.add([
+        k.circle(44), k.pos(boss.pos), k.anchor("center"),
+        k.color(255, 255, 220), k.opacity(0.95), k.z(17),
+        k.lifespan(0.12, { fade: 0.10 }),
+      ]);
+      // Debris sparks radiating outward
+      for (let i = 0; i < 10; i++) {
+        const ang = (i / 10) * Math.PI * 2 + k.rand(-0.2, 0.2);
+        k.add([
+          k.rect(5, 5), k.pos(boss.pos), k.anchor("center"),
+          k.color(255, 160, 40), k.opacity(0.9), k.z(18),
+          k.move(k.vec2(Math.cos(ang), Math.sin(ang)), k.rand(160, 320)),
+          k.lifespan(0.4, { fade: 0.3 }),
+        ]);
+      }
+
+      // AOE damage to Archie if in range
+      const distToArchie = boss.pos.dist(archie.pos);
+      if (distToArchie < AOE_R && k.time() >= archie.blessedUntil) {
+        const dmg = distToArchie < AOE_R * 0.5 ? 2 : 1;
+        damageArchie(dmg);
+        popup(archie.pos,
+          distToArchie < AOE_R * 0.5 ? "DIRECT IMPACT!" : "SHOCKWAVE!",
+          [255, 120, 60]);
+      }
+
+      // Final PM buzzword at landing
+      popup(boss.pos.add(k.vec2(0, -72)), buzzword(), [255, 230, 100]);
 
       boss.enterState("stunned");
     });
