@@ -4994,9 +4994,9 @@ k.scene("level", (data: { idx: number; score: number }) => {
     const boss = k.add([
       k.sprite("boss_cthulhu_idle"),
       k.pos(ARENA_MID, HOVER_Y),
-      k.area({ scale: 0.7 }),
+      k.area({ scale: 0.65 }),
       k.anchor("center"),
-      k.scale(5),
+      k.scale(7),
       k.z(8),
       k.health(bossCfg.hp),
       k.state("hover", ["hover", "brainstorm", "slam", "stunned"]),
@@ -5051,20 +5051,61 @@ k.scene("level", (data: { idx: number; score: number }) => {
       boss.pos.y = HOVER_Y + Math.sin(k.time() * 3) * 6;
     });
 
-    // ── STATE: SLAM — warning shake then ground-plunge ────────────────────────
+    // ── STATE: SLAM — warning judder + 3-clone plunge (only 1 is real) ────────
     boss.onStateEnter("slam", async () => {
-      // Red tint warning
+      // Red tint + 5-tick horizontal judder as warning
       boss.color = k.rgb(255, 100, 100);
-      // 5-tick horizontal judder
       for (let i = 0; i < 5; i++) {
         boss.pos.x += k.rand(-18, 18);
         await k.wait(0.08);
       }
       boss.color = k.rgb(255, 255, 255);
-      // Plunge
+
+      // Three X positions spread across the arena — shuffle so real one is random
+      const thirds = [
+        ARENA_LEFT  + (ARENA_RIGHT - ARENA_LEFT) * 0.18,
+        ARENA_MID,
+        ARENA_RIGHT - (ARENA_RIGHT - ARENA_LEFT) * 0.18,
+      ];
+      // Fisher-Yates shuffle with kaboom rand
+      for (let i = 2; i > 0; i--) {
+        const j = Math.floor(k.rand(0, i + 1));
+        const tmp = thirds[i]; thirds[i] = thirds[j]; thirds[j] = tmp;
+      }
+
+      // Real boss snaps to thirds[0] — player can't know which one
+      boss.pos.x = thirds[0];
+      boss.pos.y = HOVER_Y;
+
+      // Spawn 2 ghost decoys at the other two positions — identical look
+      const decoys = [thirds[1], thirds[2]].map(dx => k.add([
+        k.sprite("boss_cthulhu_idle"),
+        k.pos(dx, HOVER_Y),
+        k.anchor("center"),
+        k.scale(7),
+        k.opacity(1),
+        k.z(7),
+        k.color(255, 255, 255),
+        "cthulhu_decoy",
+      ]));
+
+      // All three plunge simultaneously — player must pick the real landing spot
+      for (const d of decoys) {
+        k.tween(d.pos.y, SLAM_Y, 0.18,
+          (v) => { if (d.exists()) d.pos.y = v; }, k.easings.easeInQuad);
+      }
       await k.tween(boss.pos.y, SLAM_Y, 0.18,
         (v) => { boss.pos.y = v; }, k.easings.easeInQuad);
-      k.shake(6);
+
+      k.shake(8);
+
+      // Decoys burst and vanish — revealing the real boss on the ground
+      for (const d of decoys) {
+        if (!d.exists()) continue;
+        k.addKaboom(d.pos, { scale: 0.9 });
+        k.destroy(d);
+      }
+
       boss.enterState("stunned");
     });
 
