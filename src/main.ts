@@ -9,6 +9,7 @@ import kaboom from "kaboom";
 import {
   archie_idle, archie_run_a, archie_run_b, archie_jump_pose,
   archie_fall_pose, archie_drink_pose,
+  archie_crouch,
   archie_whack_wind, archie_whack_swing, archie_shield, archie_damage,
   scope_creep, weapon_blueprint, weapon_hammer, coffee_bean, ground_tile,
   coffee_cup, weapon_wand, trap_misplacement, item_shield,
@@ -2385,7 +2386,8 @@ k.loadSprite("archie_run_b", archie_run_b);
 k.loadSprite("archie_jump", archie_jump_pose);
 k.loadSprite("archie_fall", archie_fall_pose);
 k.loadSprite("archie_drink", archie_drink_pose);
-// ARCH-420: whack & shield pose frames
+// ARCH-420: whack, shield, crouch, damage pose frames
+k.loadSprite("archie_crouch",      archie_crouch);
 k.loadSprite("archie_whack_wind",  archie_whack_wind);
 k.loadSprite("archie_whack_swing", archie_whack_swing);
 k.loadSprite("archie_shield",      archie_shield);
@@ -3798,6 +3800,8 @@ k.scene("level", (data: { idx: number; score: number }) => {
   let currentArchieFrame = "archie"; // kept for espresso afterimage spawning
   let runAnimT = 0;
   // ARCH-420: dual-mode blueprint — whack (X) and shield (C-hold)
+  // ARCH-422: crouch (Down arrow, ground-only)
+  let crouching = false;
   let whackPhase: "none" | "wind" | "swing" = "none";
   let whackEndT = 0;       // k.time() when the full whack animation ends
   let whackSwingT = 0;     // k.time() when swing phase starts
@@ -3833,6 +3837,11 @@ k.scene("level", (data: { idx: number; score: number }) => {
       const b = Math.sin(k.time() * 4) * 0.015;
       sx = ARCHIE_SCALE * (1 + b);
       sy = ARCHIE_SCALE * (1 - b);
+    } else if (crouching) {
+      nextFrame = "archie_crouch";
+      // Slight squash — wide and low
+      sx = ARCHIE_SCALE * 1.10;
+      sy = ARCHIE_SCALE * 0.82;
     } else if (k.time() < damagedFlashUntil) {
       nextFrame = "archie_damage";
       sx = ARCHIE_SCALE * 1.1;
@@ -3921,6 +3930,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
   const DOUBLE_JUMP_FORCE = JUMP_FORCE * 0.85;
   k.onKeyPress("up", () => {
     if (archie.frozen) return;
+    if (crouching) return; // ARCH-422: can't jump while crouching
     jumpBufferedT = k.time();
   });
 
@@ -4007,6 +4017,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
   function startShield() {
     if (shielding || whackPhase !== "none" || archie.frozen) return;
     shielding = true;
+    crouching = false; // ARCH-422: shield is two-handed; exit crouch automatically
     // Spawn the cyan bubble entity (follows Archie in onUpdate)
     shieldBubble = k.add([
       k.circle(52), k.anchor("center"),
@@ -4033,6 +4044,19 @@ k.scene("level", (data: { idx: number; score: number }) => {
   }
   k.onKeyDown("c", () => startShield());
   k.onKeyRelease("c", () => endShield());
+
+  // ==========================================================================
+  // ARCH-422: CROUCH (Down arrow) — ground-only. Squashes hitbox visually,
+  // halves movement speed, blocks jumping. Can still whack from a crouch.
+  // Shield automatically exits crouch (two-handed). Crouch exits on key up
+  // or when leaving the ground.
+  // ==========================================================================
+  k.onKeyDown("down", () => {
+    if (archie.frozen || shielding) return;
+    if (!archie.isGrounded()) return; // can only crouch on the ground
+    crouching = true;
+  });
+  k.onKeyRelease("down", () => { crouching = false; });
 
   // ARCH-420: ARCHIE onUpdate additions for whack/shield.
   // (Appended to the existing archie.onUpdate block later via the main hook.)
@@ -4244,6 +4268,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
 
   let invulnUntil = 0;
   function damageArchie(halves: number) {
+    if (shielding) return;               // ARCH-422: blueprint shield absorbs damage
     if (k.time() < archie.blessedUntil) return;
     if (k.time() < invulnUntil) return;
     invulnUntil = k.time() + 1.0;
@@ -5813,6 +5838,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
     if (w.is("projectile")) k.destroy(w);
   });
   archie.onCollide("enemy", (e: any) => {
+    if (shielding) return; // ARCH-422: shield absorbs enemy contact entirely
     if (k.time() < archie.blessedUntil) {
       if (!e.is("boss")) { popup(e.pos, "APPROVED [OK]", [120, 255, 120]); k.destroy(e); }
       return;
@@ -5848,6 +5874,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
   // ARCH-156: Release Demon — separate collide handler for the inversion side
   // effect; the regular enemy collision above already deals the damage.
   archie.onCollide("demon", () => {
+    if (shielding) return; // ARCH-422: shield blocks control inversion
     if (k.time() < archie.blessedUntil) return;
     if (k.time() < archie.invertedUntil) return; // already inverted
     archie.invertedUntil = k.time() + 5;
@@ -5859,7 +5886,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
   // HUD's coffee row gets overlaid with a "DECRYPTING…" loading bar for ~1.6s.
   // Damage from the same shot is already applied via the enemyShot handler.
   archie.onCollide("credentialShot", () => {
-    if (k.time() < archie.blessedUntil) return;
+    if (shielding || k.time() < archie.blessedUntil) return; // ARCH-422: shield blocks decrypt debuff
     archie.decryptingUntil = k.time() + 1.6;
   });
   // ARCH-198: "REPLACING COFFEE" — Archie raises a coffee cup to his face,
@@ -6215,8 +6242,11 @@ k.scene("level", (data: { idx: number; score: number }) => {
     if (shielding) {
       // Shielding relieves stress — drains cognitive load (lowers enemy dmg mult)
       if (!archie.locked) archie.cognitiveLoad = Math.max(0, archie.cognitiveLoad - 0.25 * k.dt());
-      // Keep blessing refreshed each frame
-      archie.blessedUntil = k.time() + 0.1;
+      // NOTE: do NOT set blessedUntil here. blessedUntil is the CTO blessing
+      // (destroys non-boss enemies on contact). The blueprint shield only blocks
+      // damage to Archie — it does not annihilate enemies or bypass immunities.
+      // Auto-exit crouch if player somehow starts shielding while grounded+crouched
+      if (crouching) crouching = false;
       // Move the bubble to track Archie
       if (shieldBubble && shieldBubble.exists()) {
         const bubbleX = archie.pos.x - archie.facing * 20;
@@ -6258,6 +6288,8 @@ k.scene("level", (data: { idx: number; score: number }) => {
       lastGroundedT = k.time();
       airJumpsLeft = MAX_AIR_JUMPS;  // refill air jump on landing
     }
+    // ARCH-422: crouch only valid on the ground; auto-exit if knocked airborne
+    if (crouching && !grounded) crouching = false;
     const buffered = k.time() - jumpBufferedT < 0.12;
     const coyote  = k.time() - lastGroundedT  < 0.10;
     if (buffered && !archie.frozen) {

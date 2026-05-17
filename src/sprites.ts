@@ -100,6 +100,33 @@ export const archie_drink_pose = wrapSVG(`
   <rect x="9" y="15" width="3" height="1" fill="#000"/>
 `);
 
+// ARCHIE — Crouch pose. Hat stays, torso compressed, legs bent wide and low.
+// Visually reads as a fast dodge-duck; feet stay on the ground line.
+export const archie_crouch = wrapSVG(`
+  <!-- Hat — same crown + brim as idle so the silhouette is recognisable -->
+  <rect x="4" y="2" width="8" height="4" fill="#E74C3C"/>
+  <rect x="2" y="6" width="12" height="2" fill="#E74C3C"/>
+  <!-- Face — compressed one row lower than idle -->
+  <rect x="5" y="8" width="6" height="3" fill="#FAD7A1"/>
+  <rect x="6" y="9" width="1" height="1" fill="#000"/>
+  <rect x="10" y="9" width="1" height="1" fill="#000"/>
+  <!-- Gritted mouth -->
+  <rect x="7" y="10" width="2" height="1" fill="#8B4444"/>
+  <!-- Torso — shorter/squashed, wide shoulder hints -->
+  <rect x="3" y="11" width="10" height="2" fill="#5D6D7E"/>
+  <rect x="7" y="11" width="2" height="2" fill="#FFFFFF"/>
+  <rect x="7" y="12" width="2" height="1" fill="#E74C3C"/>
+  <!-- Arms dropped to sides -->
+  <rect x="1" y="11" width="2" height="2" fill="#E74C3C"/>
+  <rect x="13" y="11" width="2" height="2" fill="#E74C3C"/>
+  <!-- Bent legs — thighs splayed outward, feet planted -->
+  <rect x="2" y="13" width="4" height="2" fill="#5D6D7E"/>
+  <rect x="10" y="13" width="4" height="2" fill="#5D6D7E"/>
+  <!-- Feet / shoes flat on the ground -->
+  <rect x="1" y="15" width="5" height="1" fill="#000"/>
+  <rect x="10" y="15" width="5" height="1" fill="#000"/>
+`);
+
 // =============================================================================
 // ARCH-420: WHACK / SHIELD sprite set — implementing the dual-mode blueprint
 // design from the spritesheet (image_3.png). All frames share the standard
