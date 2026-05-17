@@ -2465,7 +2465,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
   const GROUND_Y = k.height() - GROUND_H;
   // ARCH-127: procedural level length — varies per run, generously long now
   // so the enemy budget actually has room to breathe.
-  const LW = Math.round(k.rand(3400, 4400));
+  const LW = Math.round(k.rand(6200, 9000)); // ARCH-440: much longer levels
   const bossGateX = LW - 760;
   const spawnPos = k.vec2(90, 200);
 
@@ -3257,11 +3257,80 @@ k.scene("level", (data: { idx: number; score: number }) => {
     }
   });
 
-  // ARCH-46: invisible physics ground + end walls.
-  k.add([
-    k.rect(LW, GROUND_H), k.pos(0, GROUND_Y), k.area(),
-    k.body({ isStatic: true }), k.opacity(0), "ground",
-  ]);
+  // ARCH-440: PITFALL TRAPS — gaps in the floor that kill on contact.
+  // Generate 3-5 pits spaced across the playable zone, then build the ground
+  // as separate segments with the gaps between them. Each gap has an invisible
+  // kill-zone trigger and red warning stripes at the lip edges.
+  const PIT_COUNT = Math.floor(k.rand(3, 6));
+  const rawPits: Array<{ x: number; w: number }> = [];
+  for (let i = 0; i < PIT_COUNT; i++) {
+    // Spread evenly so no two pits clump together
+    const zone = (bossGateX - 600) / PIT_COUNT;
+    const px = 450 + zone * i + k.rand(80, zone - 80);
+    const pw = k.rand(110, 170);
+    rawPits.push({ x: px, w: pw });
+  }
+  // Deduplicate: drop any pit whose left edge is within 300px of the previous one
+  const pitZones: Array<{ x: number; w: number }> = [];
+  for (const p of rawPits) {
+    const prev = pitZones[pitZones.length - 1];
+    if (prev && p.x < prev.x + prev.w + 300) continue;
+    if (p.x + p.w > bossGateX - 280) continue; // keep clear before gate
+    pitZones.push(p);
+  }
+
+  // Segmented ground — solid sections between each pit
+  {
+    let segX = 0;
+    for (const pit of pitZones) {
+      if (pit.x > segX) {
+        k.add([
+          k.rect(pit.x - segX, GROUND_H), k.pos(segX, GROUND_Y), k.area(),
+          k.body({ isStatic: true }), k.opacity(0), "ground",
+        ]);
+      }
+      // ── Kill zone inside the pit ──────────────────────────────────────
+      k.add([
+        k.rect(pit.w, 120), k.pos(pit.x, GROUND_Y + 2), k.area(),
+        k.opacity(0), "pitfall",
+      ]);
+      // ── Void darkness in the pit (drawn below ground level) ───────────
+      k.add([
+        k.rect(pit.w, 160), k.pos(pit.x, GROUND_Y + 2),
+        k.color(8, 0, 20), k.opacity(1), k.z(3),
+      ]);
+      // ── Warning stripes on each lip ───────────────────────────────────
+      // Left lip
+      for (let dy = 0; dy < GROUND_H; dy += 10) {
+        k.add([
+          k.rect(12, 5), k.pos(pit.x - 12, GROUND_Y + dy),
+          k.color(dy % 20 === 0 ? 255 : 200, 40, 0), k.opacity(0.92), k.z(6),
+        ]);
+      }
+      // Right lip
+      for (let dy = 0; dy < GROUND_H; dy += 10) {
+        k.add([
+          k.rect(12, 5), k.pos(pit.x + pit.w, GROUND_Y + dy),
+          k.color(dy % 20 === 0 ? 255 : 200, 40, 0), k.opacity(0.92), k.z(6),
+        ]);
+      }
+      // Skull / "⚠" marker above each pit
+      k.add([
+        k.text("☠", { size: 18 }),
+        k.pos(pit.x + pit.w / 2, GROUND_Y - 28),
+        k.anchor("center"), k.color(255, 50, 30),
+        k.outline(2, k.rgb(0, 0, 0)), k.z(7),
+      ]);
+      segX = pit.x + pit.w;
+    }
+    // Final segment from last pit to level end
+    if (segX < LW) {
+      k.add([
+        k.rect(LW - segX, GROUND_H), k.pos(segX, GROUND_Y), k.area(),
+        k.body({ isStatic: true }), k.opacity(0), "ground",
+      ]);
+    }
+  }
   k.add([k.rect(24, 700), k.pos(-24, -60), k.area(), k.body({ isStatic: true }), k.opacity(0)]);
   k.add([k.rect(24, 700), k.pos(LW, -60), k.area(), k.body({ isStatic: true }), k.opacity(0)]);
 
@@ -3399,18 +3468,32 @@ k.scene("level", (data: { idx: number; score: number }) => {
     });
     addCollectible("bean", ex + ew / 2, ey - 42, "bean");
   }
-  // ARCH-133: collectible/prop counts scale with the longer level.
+  // ARCH-440: collectible density scales with the much longer levels.
+  // Items placed at varied heights (ground, mid-air, platform-level) and
+  // spread evenly so the player always has something to chase.
   // ARCH-404: Super Archie halves all help-item density.
   const playable = bossGateX - 220;
-  const beanInterval = difficulty === "super" ? 440 : 220; // ½ density in super
+  const beanInterval = difficulty === "super" ? 360 : 180; // dense every ~180px
   for (let i = 0; i < Math.round(playable / beanInterval); i++) {
-    addCollectible("bean", k.rand(220, bossGateX), GROUND_Y - 36, "bean");
+    const bx = k.rand(220, bossGateX);
+    // 30% chance to place bean at mid-air height (on/near a platform)
+    const by = k.rand() < 0.30 ? k.rand(180, 360) : GROUND_Y - 36;
+    addCollectible("bean", bx, by, "bean");
   }
-  // Misplacement traps already placed above; no jira collectibles any more.
-  addCollectible("armor", k.rand(320, bossGateX - 220), GROUND_Y - 40, "armor");
-  if (playable > 2200 && difficulty !== "super") addCollectible("armor", k.rand(320, bossGateX - 220), GROUND_Y - 40, "armor");
-  addCollectible("espresso", k.rand(320, bossGateX - 220), GROUND_Y - 40, "espresso");
-  if (playable > 2200 && difficulty !== "super") addCollectible("espresso", k.rand(320, bossGateX - 220), GROUND_Y - 40, "espresso");
+  // Armor: 1 per ~1800px of playable length, max 5, halved in Super
+  const armorCount = Math.min(5, Math.round(playable / 1800));
+  const armorPerRun = difficulty === "super" ? Math.ceil(armorCount / 2) : armorCount;
+  for (let i = 0; i < armorPerRun; i++) {
+    const ax = k.rand(320 + i * (playable / armorPerRun), 320 + (i + 1) * (playable / armorPerRun) - 100);
+    addCollectible("armor", Math.min(ax, bossGateX - 220), GROUND_Y - 40, "armor");
+  }
+  // Espresso: same cadence as armor
+  const espCount = Math.min(4, Math.round(playable / 2200));
+  const espPerRun = difficulty === "super" ? Math.ceil(espCount / 2) : espCount;
+  for (let i = 0; i < espPerRun; i++) {
+    const ex2 = k.rand(400 + i * (playable / espPerRun), 400 + (i + 1) * (playable / espPerRun) - 100);
+    addCollectible("espresso", Math.min(ex2, bossGateX - 280), GROUND_Y - 40, "espresso");
+  }
   // ARCH-89b: Solutions Architecture gets Legacy Code "DS" blocks (Hammer
   // required to break). Centered anchor for clean stacking, scale * 2 so each
   // native pixel becomes a satisfyingly chunky 6 screen pixels.
@@ -5566,9 +5649,9 @@ k.scene("level", (data: { idx: number; score: number }) => {
     const boss = k.add([
       k.sprite("boss_cthulhu_idle"),
       k.pos(ARENA_MID, HOVER_Y),
-      k.area({ scale: 0.65 }),
+      k.area({ scale: 0.60 }),
       k.anchor("center"),
-      k.scale(7),
+      k.scale(11), // ARCH-440: much larger & scarier
       k.z(8),
       k.health(bossCfg.hp),
       k.state("hover", ["hover", "brainstorm", "slam", "stunned"]),
@@ -5741,7 +5824,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
         k.sprite("boss_cthulhu_idle"),
         k.pos(dx, HOVER_Y),
         k.anchor("center"),
-        k.scale(7),
+        k.scale(11), // matches boss scale
         k.opacity(1),
         k.z(7),
         k.color(255, 255, 255),
@@ -6144,20 +6227,28 @@ k.scene("level", (data: { idx: number; score: number }) => {
     ]);
   }
 
-  // ARCH-80: regular-enemy spawner — runs until the boss phase begins.
-  // ARCH-134: spawn rarely + far ahead + capped by living count, so the level
-  // feels populated, not infested. The backlog is large enough already.
-  // ARCH-403: Super Archie — 50% more enemies on-screen at once, faster wave interval.
-  const MAX_LIVE_ENEMIES = difficulty === "super" ? 5 : 3;
-  k.loop(difficulty === "super" ? 1.8 : 2.8, () => {
+  // ARCH-440: Denser enemy spawner — larger cap, faster interval, multi-directional.
+  // Two separate loops: a fast forward-ambush wave and a slower rear-pincer wave
+  // so the player is pressed from both sides simultaneously.
+  const MAX_LIVE_ENEMIES = difficulty === "super" ? 8 : 5;
+  // Front-wave: ambushes from the direction Archie is heading
+  k.loop(difficulty === "super" ? 1.0 : 1.6, () => {
     if (bossPhase) return;
     if (k.get("enemy").length >= MAX_LIVE_ENEMIES) return;
     const camX = k.camPos().x;
-    // ARCH-135: spawn well off-screen, biased ahead of Archie's facing, so
-    // mobs arrive as ambushes rather than infestations.
-    const ahead = archie.facing > 0;
-    const dist = k.rand(560, 760);
-    const x = ahead ? camX + dist : camX - dist;
+    const dist = k.rand(500, 720);
+    const x = camX + (archie.facing > 0 ? dist : -dist);
+    if (x < 40 || x > bossGateX - 40) return;
+    spawnLayerMob(x);
+  });
+  // Rear-pincer: comes from behind every few seconds — keeps the player moving
+  k.loop(difficulty === "super" ? 2.2 : 3.4, () => {
+    if (bossPhase) return;
+    if (k.get("enemy").length >= MAX_LIVE_ENEMIES) return;
+    const camX = k.camPos().x;
+    // Spawn from the opposite direction to the forward wave
+    const dist = k.rand(480, 680);
+    const x = camX + (archie.facing > 0 ? -dist : dist);
     if (x < 40 || x > bossGateX - 40) return;
     spawnLayerMob(x);
   });
@@ -6372,6 +6463,13 @@ k.scene("level", (data: { idx: number; score: number }) => {
     archie.invertedUntil = k.time() + 5;
     popup(archie.pos, "!! UNSTABLE RELEASE — CONTROLS INVERTED !!", [255, 100, 255]);
   });
+  // ARCH-440: Pitfall — instant burnout (no i-frames, no damage reduction)
+  archie.onCollide("pitfall", () => {
+    popup(k.camPos(), "☠  FELL INTO THE VOID  ☠", [255, 50, 30]);
+    k.shake(12);
+    burnoutCrash();
+  });
+
   archie.onCollide("hazard", () => damageArchie(1));
 
   // BOSS-101: When a Feature Ticket lands on Archie, flash a Scrum/PM buzzword
@@ -6847,11 +6945,20 @@ k.scene("level", (data: { idx: number; score: number }) => {
     const smoothedX = curCam.x + (targetX - curCam.x) * Math.min(1, 10 * k.dt());
     k.camPos(smoothedX, k.height() / 2);
 
-    if (archie.pos.y > k.height() + 120) {
-      coffeeHalves -= 2;
-      popup(k.camPos(), "P0: FELL OFF THE ROADMAP", [255, 80, 80]);
-      archie.pos = k.vec2(targetX, 80);
-      if (coffeeHalves <= 0) burnoutCrash();
+    // Fell past the level floor — check if it was a pitfall (instant death)
+    // or a normal fall-off (2 HP damage + repositioned).
+    if (archie.pos.y > k.height() + 80) {
+      const inPit = pitZones.some(p => archie.pos.x >= p.x && archie.pos.x <= p.x + p.w);
+      if (inPit) {
+        popup(k.camPos(), "☠  SWALLOWED BY THE VOID  ☠", [255, 50, 30]);
+        k.shake(14);
+        burnoutCrash();
+      } else {
+        coffeeHalves -= 2;
+        popup(k.camPos(), "P0: FELL OFF THE ROADMAP", [255, 80, 80]);
+        archie.pos = k.vec2(targetX, 80);
+        if (coffeeHalves <= 0) burnoutCrash();
+      }
     }
 
     // BOSS-102: Layer 1 — Contradictory Request Golem at ~40% of level width.

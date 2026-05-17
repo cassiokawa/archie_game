@@ -399,37 +399,112 @@ export const trap_misplacement = wrapSVG(`
 // BOSS-101: THE MVP CTHULHU — Layer 1 final boss sprites + projectile.
 // =============================================================================
 
-// IDLE: Purple floating brain with a single giant eye (red iris) and yellow
-// post-it tentacles. Two dangling legs hint at the Cthulhu silhouette.
+// IDLE: Massive eldritch horror. Dark void body filling the full frame, a
+// giant blood-red slit-pupil eye dominating the upper mass, clusters of
+// post-it tentacles erupting from every side, a fang-lined maw, and dark
+// vein channels cracking across the surface.
 export const boss_cthulhu_idle = wrapSVG(`
-  <rect x="2" y="1" width="12" height="9"  fill="#7D3C98"/>
-  <rect x="1" y="2" width="14" height="7"  fill="#8E44AD"/>
-  <rect x="3" y="1" width="10" height="1"  fill="#9B59B6"/>
-  <rect x="5" y="3" width="6"  height="5"  fill="#9B59B6"/>
-  <rect x="5" y="5" width="6"  height="2"  fill="#ECF0F1"/>
-  <rect x="6" y="5" width="4"  height="2"  fill="#ECF0F1"/>
-  <rect x="7" y="5" width="2"  height="3"  fill="#ECF0F1"/>
-  <rect x="7" y="6" width="2"  height="1"  fill="#E74C3C"/>
-  <rect x="1" y="7" width="2"  height="3"  fill="#F1C40F"/>
-  <rect x="13" y="5" width="2" height="3"  fill="#F1C40F"/>
-  <rect x="3" y="10" width="2" height="4"  fill="#8E44AD"/>
-  <rect x="11" y="10" width="2" height="4" fill="#8E44AD"/>
-  <rect x="3" y="13" width="2" height="1"  fill="#7D3C98"/>
-  <rect x="11" y="13" width="2" height="1" fill="#7D3C98"/>
+  <!-- Void outer glow -->
+  <rect x="0" y="0" width="16" height="16" fill="#1A0A2E"/>
+  <!-- Main body mass — asymmetric organic blob -->
+  <rect x="0" y="1" width="16" height="12" fill="#4A235A"/>
+  <rect x="1" y="0" width="14" height="13" fill="#5B2C6F"/>
+  <rect x="2" y="0" width="12" height="12" fill="#6C3483"/>
+  <rect x="3" y="1" width="10" height="10" fill="#7D3C98"/>
+  <!-- Inner luminous core -->
+  <rect x="4" y="2" width="8"  height="8"  fill="#8E44AD"/>
+  <!-- Tentacle cluster — left, 3 layers of post-it yellow/orange -->
+  <rect x="0" y="0" width="3"  height="2"  fill="#F1C40F"/>
+  <rect x="0" y="3" width="2"  height="3"  fill="#E67E22"/>
+  <rect x="0" y="7" width="3"  height="2"  fill="#F39C12"/>
+  <rect x="0" y="10" width="2" height="3"  fill="#F1C40F"/>
+  <!-- Tentacle cluster — right, staggered -->
+  <rect x="14" y="0" width="2" height="3"  fill="#F39C12"/>
+  <rect x="13" y="4" width="3" height="2"  fill="#F1C40F"/>
+  <rect x="14" y="7" width="2" height="3"  fill="#E67E22"/>
+  <rect x="13" y="10" width="3" height="2" fill="#F1C40F"/>
+  <!-- Giant central eye: sclera -->
+  <rect x="3"  y="2" width="10" height="7" fill="#F0E8F4"/>
+  <rect x="4"  y="2" width="8"  height="7" fill="#EDE0F0"/>
+  <!-- Blood-red iris -->
+  <rect x="4"  y="2" width="8"  height="7" fill="#922B21"/>
+  <rect x="5"  y="3" width="6"  height="5" fill="#C0392B"/>
+  <rect x="6"  y="3" width="4"  height="5" fill="#E74C3C"/>
+  <!-- Vertical slit pupil — dark, reptilian -->
+  <rect x="7"  y="1" width="2"  height="9" fill="#1A1A2E"/>
+  <rect x="7"  y="2" width="2"  height="7" fill="#000000"/>
+  <!-- Corneal shine (two catch-lights for depth) -->
+  <rect x="11" y="3" width="1"  height="2" fill="#FFFFFF"/>
+  <rect x="10" y="3" width="1"  height="1" fill="#F0E8F4"/>
+  <!-- Horror veins radiating from eye -->
+  <rect x="3"  y="4" width="1"  height="2" fill="#C0392B"/>
+  <rect x="12" y="3" width="1"  height="3" fill="#C0392B"/>
+  <rect x="5"  y="8" width="2"  height="1" fill="#E74C3C"/>
+  <rect x="9"  y="8" width="2"  height="1" fill="#E74C3C"/>
+  <!-- Dark vein cracks across body mass -->
+  <rect x="2"  y="6" width="1"  height="4" fill="#3D1454"/>
+  <rect x="13" y="5" width="1"  height="4" fill="#3D1454"/>
+  <rect x="5"  y="1" width="1"  height="2" fill="#3D1454"/>
+  <rect x="10" y="1" width="1"  height="2" fill="#3D1454"/>
+  <!-- Fang row below eye -->
+  <rect x="3"  y="9" width="2"  height="3" fill="#F0E8F4"/>
+  <rect x="6"  y="9" width="2"  height="4" fill="#F0E8F4"/>
+  <rect x="9"  y="9" width="2"  height="3" fill="#F0E8F4"/>
+  <rect x="12" y="9" width="2"  height="3" fill="#F0E8F4"/>
+  <!-- Mouth cavity (void darkness behind fangs) -->
+  <rect x="3"  y="10" width="10" height="2" fill="#0D0520"/>
+  <!-- Four thick bottom tentacles dangling -->
+  <rect x="0"  y="12" width="3" height="4" fill="#6C3483"/>
+  <rect x="4"  y="12" width="3" height="4" fill="#5B2C6F"/>
+  <rect x="9"  y="12" width="3" height="4" fill="#7D3C98"/>
+  <rect x="13" y="12" width="3" height="4" fill="#6C3483"/>
+  <!-- Tentacle tip post-its (yellow) -->
+  <rect x="0"  y="15" width="3" height="1" fill="#F39C12"/>
+  <rect x="4"  y="15" width="3" height="1" fill="#F1C40F"/>
+  <rect x="9"  y="15" width="3" height="1" fill="#F39C12"/>
+  <rect x="13" y="15" width="3" height="1" fill="#E67E22"/>
 `);
 
-// STUNNED: Sagging, half-shut eye, drooping post-its — on the ground & exposed.
+// STUNNED: Collapsed on the ground — body sagging, eye half-shut with a
+// dazed drooping eyelid, tentacles splayed flat, dizzy post-it sparks.
 export const boss_cthulhu_stun = wrapSVG(`
-  <rect x="1" y="6" width="14" height="8"  fill="#7D3C98"/>
-  <rect x="2" y="7" width="12" height="6"  fill="#8E44AD"/>
-  <rect x="5" y="8" width="6"  height="3"  fill="#ECF0F1"/>
-  <rect x="6" y="9" width="4"  height="1"  fill="#E74C3C"/>
-  <rect x="7" y="9" width="2"  height="1"  fill="#000"/>
-  <rect x="5" y="11" width="6" height="1"  fill="#5D2A72"/>
-  <rect x="1" y="12" width="3" height="2"  fill="#F1C40F"/>
-  <rect x="12" y="10" width="3" height="2" fill="#F1C40F"/>
-  <rect x="5" y="14" width="2" height="2"  fill="#8E44AD"/>
-  <rect x="9" y="14" width="2" height="2"  fill="#8E44AD"/>
+  <!-- Void background -->
+  <rect x="0" y="0" width="16" height="16" fill="#1A0A2E"/>
+  <!-- Flattened body, sagging to bottom half -->
+  <rect x="0" y="7" width="16" height="9"  fill="#4A235A"/>
+  <rect x="1" y="8" width="14" height="7"  fill="#5B2C6F"/>
+  <rect x="2" y="8" width="12" height="6"  fill="#6C3483"/>
+  <rect x="3" y="9" width="10" height="5"  fill="#7D3C98"/>
+  <!-- Half-shut eye: upper eyelid drooping -->
+  <rect x="3"  y="9"  width="10" height="5" fill="#F0E8F4"/>
+  <rect x="3"  y="11" width="10" height="3" fill="#4A235A"/>
+  <!-- Dazed iris (dim, half-covered) -->
+  <rect x="4"  y="9"  width="8"  height="2" fill="#922B21"/>
+  <rect x="5"  y="9"  width="6"  height="2" fill="#C0392B"/>
+  <!-- Drooped pupil -->
+  <rect x="7"  y="9"  width="2"  height="3" fill="#000"/>
+  <!-- Dazed shine -->
+  <rect x="10" y="9"  width="1"  height="1" fill="#FFF"/>
+  <!-- Vein blush (stunned red flush across body) -->
+  <rect x="2"  y="10" width="1"  height="2" fill="#E74C3C"/>
+  <rect x="13" y="10" width="1"  height="2" fill="#E74C3C"/>
+  <!-- Mouth open: fangs visible, gap dark -->
+  <rect x="3"  y="13" width="10" height="2" fill="#0D0520"/>
+  <rect x="4"  y="13" width="2"  height="2" fill="#F0E8F4"/>
+  <rect x="7"  y="13" width="2"  height="2" fill="#F0E8F4"/>
+  <rect x="10" y="13" width="2"  height="2" fill="#F0E8F4"/>
+  <!-- Splayed tentacles (lying flat) -->
+  <rect x="0"  y="8"  width="2"  height="2" fill="#F1C40F"/>
+  <rect x="14" y="8"  width="2"  height="2" fill="#F39C12"/>
+  <rect x="0"  y="13" width="3"  height="2" fill="#6C3483"/>
+  <rect x="13" y="13" width="3"  height="2" fill="#5B2C6F"/>
+  <rect x="4"  y="15" width="3"  height="1" fill="#7D3C98"/>
+  <rect x="9"  y="15" width="3"  height="1" fill="#7D3C98"/>
+  <!-- Dizzy post-it sparks floating above (stunned stars) -->
+  <rect x="2"  y="5"  width="2"  height="1" fill="#F1C40F"/>
+  <rect x="6"  y="4"  width="2"  height="1" fill="#F39C12"/>
+  <rect x="10" y="5"  width="2"  height="1" fill="#F1C40F"/>
+  <rect x="13" y="4"  width="2"  height="1" fill="#E67E22"/>
 `);
 
 // FEATURE TICKET: Falling yellow post-it with a dark-gold header stripe.
