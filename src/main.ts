@@ -2402,9 +2402,9 @@ k.loadSprite("bean1", coffee_bean); // alias so any leftover cycle refs stay val
 k.loadSprite("bean2", coffee_bean);
 k.loadSprite("ground", ground_tile);
 k.loadSprite("groundtile", ground_tile);
-k.loadSprite("cup_full", coffee_cup);   // SVG cup replaces canvas cup_full
-k.loadSprite("cup_half", coffee_cup);   // same visual; state shown via opacity
-k.loadSprite("cup_empty", coffee_cup);
+// ARCH-441: cup_full / cup_half / cup_empty use the pixelSprite definitions
+// (distinct fill levels) — do NOT override with the generic coffee_cup SVG
+// because that collapses all three states to identical visuals.
 k.loadSprite("wand", weapon_wand);
 k.loadSprite("misplacement", trap_misplacement);
 k.loadSprite("armor", item_shield); // override blurry canvas arc shield
@@ -2488,6 +2488,159 @@ k.scene("level", (data: { idx: number; score: number }) => {
       });
     }
   }
+  // ── ARCH-441: SHARED DEEP-PARALLAX LAYER ───────────────────────────────────
+  // Three depth bands applied at the start of EVERY layer backdrop:
+  //   Band A  par=0.04  MVP/MLP Bat-Signal — barely moves, feels cosmic
+  //   Band B  par=0.07  Mountains of Change Requests — silhouetted ticket piles
+  //   Band C  par=0.14  Digital clouds — drift rightward, hide buzzword secrets
+  // Call drawSharedParallax(camX, W) AFTER the base sky rect in each idx block.
+  // ──────────────────────────────────────────────────────────────────────────
+  function drawSharedParallax(camX: number, W: number) {
+    const t = k.time();
+
+    // ── Band A: MVP / MLP BAT-SIGNAL ─────────────────────────────────────────
+    // Searchlight-style projector throwing 6 slowly-rotating beams, with "MVP"
+    // or "MLP?" emblazoned like a corporate batman logo in the far background.
+    {
+      const par = 0.04, SP = 1800;
+      const scroll = camX * par;
+      const base = Math.floor(scroll / SP);
+      const off = scroll - base * SP;
+      // One signal per 1800 world-units; only ~1 on screen at a time
+      for (let i = -1; i <= 1; i++) {
+        const sigX = i * SP - off + SP * 0.55;
+        const sigY = 75;
+        const radius = 54;
+        if (sigX < -80 || sigX > W + 80) continue;
+
+        // 6 rotating searchlight beams
+        for (let b = 0; b < 6; b++) {
+          const ang = t * 0.20 + b * (Math.PI * 2 / 6);
+          k.drawLine({
+            p1: k.vec2(sigX, sigY),
+            p2: k.vec2(sigX + Math.cos(ang) * 280, sigY + Math.sin(ang) * 220),
+            width: 20, color: k.rgb(240, 210, 55), opacity: 0.07,
+          });
+        }
+        // Soft outer glow ring
+        k.drawCircle({ pos: k.vec2(sigX, sigY), radius: radius + 9,
+          color: k.rgb(240, 190, 40), opacity: 0.14 });
+        // Dark projector disc
+        k.drawCircle({ pos: k.vec2(sigX, sigY), radius,
+          color: k.rgb(8, 5, 16), opacity: 0.90 });
+        // "MVP" emblem
+        k.drawText({ text: "MVP", size: 24,
+          pos: k.vec2(sigX, sigY - 8), anchor: "center",
+          color: k.rgb(240, 210, 50), opacity: 0.92,
+          outline: { width: 3, color: k.rgb(0, 0, 0) } });
+        // "or MLP?" sub-glyph — the eternal PM debate
+        k.drawText({ text: "or MLP?", size: 10,
+          pos: k.vec2(sigX, sigY + 18), anchor: "center",
+          color: k.rgb(255, 175, 45), opacity: 0.68 });
+      }
+    }
+
+    // ── Band B: MOUNTAINS OF CHANGE REQUESTS ─────────────────────────────────
+    // Jagged staircase silhouettes coloured like post-it notes, suggesting
+    // infinite stacks of printed requirements piled into mountain ranges.
+    // Each peak gets 6 "ticket line" stripes and a label on tall ones.
+    {
+      const par = 0.07, SP = 255;
+      const scroll = camX * par;
+      const base = Math.floor(scroll / SP);
+      const off = scroll - base * SP;
+      for (let i = -1; i < W / SP + 3; i++) {
+        const ai = base + i;
+        const seed = ((ai * 1664525 + 1013904223) >>> 0) % 1000;
+        const mh  = 65  + (seed * 0.145) | 0;           // 65–210 px tall
+        const mw  = 175 + ((seed * 37) % 85);            // 175–260 px wide
+        const mx  = i * SP - off;
+        const myBase = GROUND_Y - mh;
+        const tR = 195 + ((seed * 11) % 45);
+        const tG = 125 + ((seed * 7)  % 55);
+        const tB = 8   + ((seed * 3)  % 32);
+
+        // Staircase silhouette: 10 steps wide→narrow toward peak
+        const STEPS = 10;
+        for (let s = 0; s < STEPS; s++) {
+          const frac = (s + 1) / STEPS;
+          const sw = mw * (0.08 + frac * 0.92);
+          const sh = (mh / STEPS) + 1;
+          const sx = mx + (mw - sw) / 2;
+          k.drawRect({ pos: k.vec2(sx, myBase + s * (mh / STEPS)),
+            width: sw, height: sh,
+            color: k.rgb(tR, tG, tB), opacity: 0.20 });
+        }
+        // Horizontal "ticket text" stripes
+        for (let ln = 0; ln < 6; ln++) {
+          const lf   = 0.18 + ln * 0.13;
+          const ly   = myBase + mh * lf;
+          const lw   = mw * (0.08 + lf * 0.92) * 0.62;
+          const lx   = mx + (mw - lw) / 2;
+          k.drawRect({ pos: k.vec2(lx, ly), width: lw, height: 2,
+            color: k.rgb(Math.max(0, tR - 35), Math.max(0, tG - 35), tB),
+            opacity: 0.30 });
+        }
+        // Label on tall peaks
+        if (mh > 130) {
+          k.drawText({ text: "CHANGE REQ", size: 7,
+            pos: k.vec2(mx + mw / 2, myBase + mh * 0.52),
+            anchor: "center",
+            color: k.rgb(Math.min(255, tR + 25), Math.min(255, tG + 25), 55),
+            opacity: 0.38 });
+        }
+      }
+    }
+
+    // ── Band C: DIGITAL CLOUDS with secret buzzword confessions ──────────────
+    // Semi-transparent puffs that drift slowly rightward independent of
+    // scrolling, each concealing an agile buzzword / PM confession inside.
+    // The cloud shape is three overlapping rects (main blob + two top lobes).
+    const CLOUD_SECRETS = [
+      "99% DONE",           "JUST 1 MORE FEATURE",  "MVP = 6 MOS LATE",
+      "SHIP IT!",           "PLS ADVISE",            "AS PER MY LAST EMAIL",
+      "QUICK SYNC?",        "LOW-HANGING FRUIT",     "BOIL THE OCEAN",
+      "MOVE THE NEEDLE",    "SYNERGY!",              "CIRCLE BACK",
+      "BANDWIDTH ISSUES",   "REWRITE IN RUST",       "TBD",
+      "STAKEHOLDERS SAID",  "NO DOCS",               "DONE = DONE?",
+      "STORY POINTS!",      "SPRINT 47 AGAIN",
+    ];
+    {
+      const par = 0.14;
+      const drift = t * 20;              // slow rightward auto-drift (px/s)
+      const scroll = camX * par - drift;
+      const SP = 315;
+      const base = Math.floor(scroll / SP);
+      const off  = scroll - base * SP;
+      for (let i = -1; i < W / SP + 3; i++) {
+        const ai  = ((base + i) % 9973 + 9973) % 9973;
+        const cx  = i * SP - off + 55;
+        const cy  = 22 + ((ai * 197) % 155);
+        const cw  = 105 + ((ai * 61) % 95);
+        const ch  = 36 + ((ai * 113) % 24);
+        const op  = 0.11 + ((ai * 7) % 10) * 0.009;
+
+        // Three-lobe cloud shape
+        k.drawRect({ pos: k.vec2(cx, cy + ch * 0.22),
+          width: cw, height: ch * 0.78,
+          color: k.rgb(218, 215, 255), opacity: op });
+        k.drawRect({ pos: k.vec2(cx + cw * 0.07, cy),
+          width: cw * 0.54, height: ch * 0.66,
+          color: k.rgb(228, 225, 255), opacity: op * 0.88 });
+        k.drawRect({ pos: k.vec2(cx + cw * 0.40, cy + ch * 0.06),
+          width: cw * 0.48, height: ch * 0.60,
+          color: k.rgb(222, 220, 255), opacity: op * 0.82 });
+
+        // Buzzword secret text inside the cloud
+        const msg = CLOUD_SECRETS[(ai * 17) % CLOUD_SECRETS.length];
+        k.drawText({ text: msg, size: 8,
+          pos: k.vec2(cx + cw / 2, cy + ch * 0.65),
+          anchor: "center",
+          color: k.rgb(130, 110, 210), opacity: 0.72 });
+      }
+    }
+  }
+
   bg.onDraw(() => {
     const camX = k.camPos().x;
     const W = k.width(), H = k.height();
@@ -2497,6 +2650,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
     // DS blocks; no skyline, no buildings, no fresh air.
     if (idx === 0) {
       k.drawRect({ width: W, height: H, color: k.rgb(0, 0, 0) });
+      drawSharedParallax(camX, W);
 
       // ARCH-308: Future-Healer-style city-lights backdrop + warm horizon
       // glow. Distant lit windows scattered at deep parallax give the
@@ -2591,6 +2745,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
     // floor. No skyline — DDD lives in the abstract.
     if (idx === 1) {
       k.drawRect({ width: W, height: H, color: k.rgb(8, 18, 40) });
+      drawSharedParallax(camX, W);
       k.drawSprite({
         sprite: "vortex",
         pos: k.vec2(W / 2, H / 2),
@@ -2663,6 +2818,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
     // that this layer is drowning in mismanaged data.
     if (idx === 2) {
       k.drawRect({ width: W, height: H, color: k.rgb(0, 0, 0) });
+      drawSharedParallax(camX, W);
 
       // ARCH-310: muddy amber/green horizon glow — toxic swamp sunset.
       k.drawSprite({
@@ -2729,6 +2885,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
     // cooling fans at floor level, red JIRA floor stamps.
     if (idx === 3) {
       k.drawRect({ width: W, height: H, color: k.rgb(20, 25, 30) });
+      drawSharedParallax(camX, W);
 
       // ARCH-311: hot red horizon glow + distant lit windows — server racks
       // glowing from internal heat, datacenter at sunset.
@@ -2852,6 +3009,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
     // at the floor during flood phase.
     if (idx === 4) {
       k.drawRect({ width: W, height: H, color: k.rgb(8, 14, 12) });
+      drawSharedParallax(camX, W);
 
       // ARCH-312: green Matrix horizon glow — the security console terminal feel.
       k.drawSprite({
@@ -3021,6 +3179,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
     // trapezoid-pattern floor tiles, AI/ML terminology stamps in cyan.
     if (idx === 5) {
       k.drawRect({ width: W, height: H, color: k.rgb(10, 14, 28) });
+      drawSharedParallax(camX, W);
 
       // ARCH-313: bright cyan horizon glow — AI data-center luminance.
       k.drawSprite({
@@ -3147,6 +3306,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
     // mathematically a black hole.
     if (idx === 6) {
       k.drawRect({ width: W, height: H, color: k.rgb(12, 4, 20) });
+      drawSharedParallax(camX, W);
       // Rotating cosmic vortex centered on screen (purple-tinted)
       k.drawSprite({
         sprite: "vortex",
