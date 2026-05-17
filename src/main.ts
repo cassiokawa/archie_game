@@ -3736,11 +3736,16 @@ k.scene("level", (data: { idx: number; score: number }) => {
   k.onKeyDown("right", () => walk(1));
   // ARCH-301: tight platformer feel — COYOTE TIME (jump shortly after leaving
   // a platform) + JUMP BUFFER (queue a jump press that fires the moment
-  // Archie lands). Both windows are 0.12s, matching the kaboom action-platformer
-  // norm. The actual jump-fire decision moves to archie.onUpdate (see
-  // ARCH-302).
+  // Archie lands). Both windows are 0.12s. ARCH-310 adds DOUBLE JUMP:
+  // Archie gets one extra mid-air jump (slightly weaker, 85 % force) before
+  // he must land to reset. The air-jump is consumed immediately on press so
+  // it feels responsive; the coyote window still acts as the "first" jump,
+  // keeping the controls forgiving near platform edges.
   let jumpBufferedT = -10;
   let lastGroundedT = -10;
+  let airJumpsLeft = 0;        // reset to 1 on every landing
+  const MAX_AIR_JUMPS = 1;
+  const DOUBLE_JUMP_FORCE = JUMP_FORCE * 0.85;
   k.onKeyPress("up", () => {
     if (archie.frozen) return;
     jumpBufferedT = k.time();
@@ -5268,17 +5273,45 @@ k.scene("level", (data: { idx: number; score: number }) => {
       }
     }
 
-    // ARCH-302: coyote-time + jump-buffer fire. If Archie is currently
-    // grounded, refresh the grounded timestamp. If a recent jump press is
-    // buffered AND we're still inside the coyote window, fire the jump now
-    // and consume both timers so it can't chain.
-    if (archie.isGrounded()) lastGroundedT = k.time();
+    // ARCH-302 / ARCH-310: coyote-time + jump-buffer + double-jump.
+    //   • Landing resets airJumpsLeft to MAX_AIR_JUMPS (1).
+    //   • First jump: buffered press inside coyote window → full JUMP_FORCE.
+    //   • Second jump: buffered press while airborne + airJumpsLeft > 0
+    //     → 85 % force air-jump; also squirts a small dust burst upward.
+    const grounded = archie.isGrounded();
+    if (grounded) {
+      lastGroundedT = k.time();
+      airJumpsLeft = MAX_AIR_JUMPS;  // refill air jump on landing
+    }
     const buffered = k.time() - jumpBufferedT < 0.12;
-    const coyote = k.time() - lastGroundedT < 0.10;
-    if (buffered && coyote && !archie.frozen) {
-      archie.jump(JUMP_FORCE);
-      jumpBufferedT = -10;
-      lastGroundedT = -10;
+    const coyote  = k.time() - lastGroundedT  < 0.10;
+    if (buffered && !archie.frozen) {
+      if (coyote) {
+        // Normal / coyote jump
+        archie.jump(JUMP_FORCE);
+        jumpBufferedT = -10;
+        lastGroundedT = -10;
+        airJumpsLeft = MAX_AIR_JUMPS; // still has one air jump available
+      } else if (!grounded && airJumpsLeft > 0) {
+        // Double jump — slightly weaker, with a visual "poof" burst
+        archie.jump(DOUBLE_JUMP_FORCE);
+        airJumpsLeft--;
+        jumpBufferedT = -10;
+        // Mini dust-ring so the player gets feedback
+        for (let i = 0; i < 6; i++) {
+          const angle = (i / 6) * Math.PI * 2;
+          k.add([
+            k.rect(4, 4), k.anchor("center"),
+            k.pos(archie.pos.x + Math.cos(angle) * 10,
+                  archie.pos.y + Math.sin(angle) * 10),
+            k.color(k.rgb(200, 220, 255)),
+            k.opacity(0.9),
+            k.move(k.vec2(Math.cos(angle), Math.sin(angle)), 55),
+            k.lifespan(0.22, { fade: 1 }), k.z(20),
+          ]);
+        }
+        popup(archie.pos, "↑↑", [160, 200, 255]);
+      }
     }
 
     // ARCH-303: smooth camera lerp (Future-Healer-style). Replaces the old
