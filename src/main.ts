@@ -2498,6 +2498,10 @@ const BOSS_PRELUDES: Array<{
 ];
 
 const GROUND_H = 60;
+
+// ARCH-444: One global save slot — updated after miniboss/boss victories.
+// Persists across k.go() so "return to save" works from any pause menu.
+let saveData: { idx: number; score: number; coffeeHalves: number } | null = null;
 const MAX_HALVES = 10;
 
 // ARCH-287: ADM (Architecture Development Method) phases — Layer 7's final
@@ -2608,7 +2612,7 @@ k.loadSprite("hazard_data_wave", hazard_data_wave);
 k.loadSprite("golem_shell", golem_shell);
 k.loadSprite("golem_core",  golem_core);
 
-k.scene("level", (data: { idx: number; score: number }) => {
+k.scene("level", (data: { idx: number; score: number; startCoffee?: number }) => {
   const idx = data.idx;
   const theme = SEGMENTS[idx];
   const bossCfg = BOSSES[idx];
@@ -2623,7 +2627,10 @@ k.scene("level", (data: { idx: number; score: number }) => {
   const EHMULT = difficulty === "super" ? 2   : 1;
   const eHealth = (n: number) => k.health(Math.round(n * EHMULT));
 
-  let coffeeHalves = difficulty === "super" ? Math.ceil(MAX_HALVES / 2) : MAX_HALVES;
+  // ARCH-444: restore HP from save if returning from a checkpoint
+  let coffeeHalves = data.startCoffee !== undefined
+    ? data.startCoffee
+    : (difficulty === "super" ? Math.ceil(MAX_HALVES / 2) : MAX_HALVES);
   let score = data.score;
   let weaponIdx = 0;
   let hammerBusy = false;
@@ -4835,6 +4842,19 @@ k.scene("level", (data: { idx: number; score: number }) => {
       : "BURNOUT CRASH — RESTARTED THE LAYER";
     popup(archie.pos, msg, [255, 120, 60]);
   }
+  // ARCH-444: write a new checkpoint into the module-level save slot.
+  // The player has exactly one slot; each new save overwrites the last.
+  function createSavePoint() {
+    saveData = { idx, score, coffeeHalves };
+    k.add([
+      k.fixed(), k.z(95),
+      k.text("CHECKPOINT SAVED ✓", { size: 16 }),
+      k.pos(k.width() / 2, 76), k.anchor("center"),
+      k.color(100, 255, 155), k.outline(3, k.rgb(0, 0, 0)),
+      k.lifespan(3.0, { fade: 1.0 }),
+    ]);
+  }
+
   function killReward(e: any, pts: number) {
     score += pts;
     popup(e.pos, `+${pts}`, [255, 230, 120]);
@@ -6056,6 +6076,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
         k.lifespan(3.4, { fade: 1 }),
       ]);
       k.addKaboom(golem.pos, { scale: 1.6 });
+      k.wait(0.8, () => createSavePoint()); // ARCH-444: checkpoint after miniboss
     });
 
     // ── Spawn fanfare ────────────────────────────────────────────────────────
@@ -6828,6 +6849,7 @@ k.scene("level", (data: { idx: number; score: number }) => {
       k.color(150, 255, 150), k.outline(3, k.rgb(16, 16, 24)), k.z(90),
       k.lifespan(4.5, { fade: 1.2 }), k.opacity(1),
     ]);
+    k.wait(1.2, () => createSavePoint()); // ARCH-444: checkpoint after boss
   }
 
   // ARCH-440: Denser enemy spawner — larger cap, faster interval, multi-directional.
@@ -7710,6 +7732,161 @@ k.scene("level", (data: { idx: number; score: number }) => {
       });
     }
   });
+
+  // ---------------------------------------------------------------------------
+  // ARCH-444: PAUSE SYSTEM
+  // ESC toggles pause. While paused every game entity is frozen via .paused=true
+  // so physics/AI/timers all halt.  The overlay entity (z=300, fixed) keeps
+  // drawing regardless.  Two menu options: Return to Save Point / Quit to Title.
+  // ---------------------------------------------------------------------------
+  let gamePaused = false;
+  let pauseCursor = 0; // 0 = return to save, 1 = quit to title
+
+  // Helper: freeze / thaw all non-UI entities
+  function freezeAll() {
+    k.get("*").forEach((e: any) => {
+      if (!e.is("pauseUI")) { e._pausedBefore = e.paused; e.paused = true; }
+    });
+  }
+  function thawAll() {
+    k.get("*").forEach((e: any) => {
+      if (!e.is("pauseUI")) { e.paused = e._pausedBefore ?? false; }
+    });
+  }
+
+  const pauseOverlay = k.add([k.fixed(), k.z(300), "pauseUI"]);
+  pauseOverlay.hidden = true;
+
+  pauseOverlay.onDraw(() => {
+    const W = k.width(), H = k.height();
+    // Dim the game world
+    k.drawRect({ width: W, height: H, color: k.rgb(0, 0, 0), opacity: 0.78 });
+
+    // Centre panel
+    const PW = 420, PH = 290;
+    const px = (W - PW) / 2, py = (H - PH) / 2;
+    k.drawRect({ pos: k.vec2(px, py), width: PW, height: PH,
+      color: k.rgb(10, 10, 18), opacity: 0.96,
+      outline: { width: 2, color: k.rgb(80, 80, 120) } });
+
+    // Title
+    k.drawText({ text: "■  PAUSED", size: 26,
+      pos: k.vec2(W / 2, py + 34), anchor: "center",
+      color: k.rgb(220, 220, 255),
+      outline: { width: 3, color: k.rgb(0, 0, 0) } });
+
+    // Divider
+    k.drawLine({ p1: k.vec2(px + 24, py + 62), p2: k.vec2(px + PW - 24, py + 62),
+      width: 1, color: k.rgb(80, 80, 130), opacity: 0.80 });
+
+    // Save slot info
+    const hasSave = saveData !== null;
+    if (hasSave) {
+      const sd = saveData!;
+      const layerName = SEGMENTS[sd.idx]?.name ?? `LAYER ${sd.idx + 1}`;
+      const hpFilled = Math.round(sd.coffeeHalves / 2);
+      k.drawText({
+        text: `SAVE:  ${layerName}`,
+        size: 11, pos: k.vec2(W / 2, py + 86), anchor: "center",
+        color: k.rgb(160, 200, 160), opacity: 0.90,
+      });
+      k.drawText({
+        text: `Score: ${sd.score}   HP: ${hpFilled}/5 cups`,
+        size: 11, pos: k.vec2(W / 2, py + 104), anchor: "center",
+        color: k.rgb(140, 180, 140), opacity: 0.80,
+      });
+    } else {
+      k.drawText({ text: "NO SAVE YET  —  defeat a boss to earn one",
+        size: 11, pos: k.vec2(W / 2, py + 95), anchor: "center",
+        color: k.rgb(140, 140, 140), opacity: 0.70 });
+    }
+
+    // Menu options
+    const opts = [
+      { label: "RETURN TO SAVE POINT", enabled: hasSave,
+        col: hasSave ? k.rgb(255, 220, 80)  : k.rgb(80, 80, 80) },
+      { label: "QUIT TO TITLE",        enabled: true,
+        col: k.rgb(255, 110, 110) },
+    ];
+    for (let i = 0; i < opts.length; i++) {
+      const oy = py + 152 + i * 52;
+      const isSelected = pauseCursor === i;
+
+      // Selection highlight bar
+      if (isSelected) {
+        k.drawRect({ pos: k.vec2(px + 18, oy - 6), width: PW - 36, height: 34,
+          color: k.rgb(40, 40, 70), opacity: 0.90,
+          outline: { width: 1, color: opts[i].col } });
+      }
+
+      // Arrow cursor (flashing when selected)
+      const showArrow = isSelected && Math.floor(k.time() * 4) % 2 === 0;
+      k.drawText({ text: showArrow ? "▶" : " ", size: 14,
+        pos: k.vec2(px + 32, oy + 6), anchor: "center",
+        color: opts[i].col });
+
+      // Option text
+      k.drawText({ text: opts[i].label, size: 15,
+        pos: k.vec2(W / 2 + 8, oy + 6), anchor: "center",
+        color: opts[i].col,
+        opacity: opts[i].enabled ? 1.0 : 0.40,
+        outline: { width: 2, color: k.rgb(0, 0, 0) } });
+    }
+
+    // Hints bar at bottom
+    k.drawLine({ p1: k.vec2(px + 24, py + PH - 44), p2: k.vec2(px + PW - 24, py + PH - 44),
+      width: 1, color: k.rgb(60, 60, 100), opacity: 0.70 });
+    k.drawText({ text: "[↑↓] Navigate   [ENTER] Confirm   [ESC] Resume",
+      size: 10, pos: k.vec2(W / 2, py + PH - 22), anchor: "center",
+      color: k.rgb(140, 140, 180), opacity: 0.70 });
+  });
+
+  // ESC — toggle pause (blocked while archie.frozen so prelude/cutscenes are safe)
+  k.onKeyPress("escape", () => {
+    if (archie.frozen && !gamePaused) return; // don't open during cutscenes
+    if (!gamePaused) {
+      gamePaused = true;
+      pauseOverlay.hidden = false;
+      pauseCursor = 0;
+      freezeAll();
+    } else {
+      gamePaused = false;
+      pauseOverlay.hidden = true;
+      thawAll();
+      archie.frozen = false;
+    }
+  });
+
+  // Up / Down — navigate menu while paused
+  k.onKeyPress("up", () => {
+    if (!gamePaused) return;
+    pauseCursor = (pauseCursor - 1 + 2) % 2;
+  });
+  k.onKeyPress("down", () => {
+    if (!gamePaused) return;
+    pauseCursor = (pauseCursor + 1) % 2;
+  });
+
+  // Enter / Space — confirm selection
+  function confirmPause() {
+    if (!gamePaused) return;
+    if (pauseCursor === 0) {
+      // Return to Save Point
+      if (!saveData) return;
+      gamePaused = false;
+      k.go("level", {
+        idx: saveData.idx,
+        score: saveData.score,
+        startCoffee: saveData.coffeeHalves,
+      });
+    } else {
+      // Quit to title
+      gamePaused = false;
+      k.go("title");
+    }
+  }
+  k.onKeyPress("enter",  confirmPause);
+  k.onKeyPress("space",  () => { if (gamePaused) confirmPause(); }); // space only when paused
 
   // ---------------------------------------------------------------------------
   // ARCH-69: HUD.
