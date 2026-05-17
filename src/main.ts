@@ -2142,6 +2142,131 @@ defSpriteRaw("vignette", 200, 150, (c) => {
 });
 
 // -----------------------------------------------------------------------------
+// ARCH-350: Pre-level dossier — one briefing entry per layer.
+// Each entry explains the architectural context, lists active threats,
+// available supplies, and reveals the boss intel.
+// -----------------------------------------------------------------------------
+const BRIEFINGS: {
+  lore:    string;
+  threats: string[];
+  supplies: string[];
+  bossIntel: string;
+}[] = [
+  // Layer 1 — The Agile Trenches
+  {
+    lore: `The sprint never ends. Post-its have replaced documentation.\nEveryone calls themselves a "product owner" — nobody ships.\nScope Creep colonises every corner while standups stretch\ninto existential crisis. Archie must survive before the\nretro demands a root-cause analysis of his existence.`,
+    threats: [
+      "Scope Creep  — green blobs that absorb unfinished tickets",
+      "Release Demon — touches you, inverts your controls for 5s",
+      "Misplacement Traps — corrupted folders on the floor (damage)",
+      "Feature Tickets — projectiles dropped by the boss",
+    ],
+    supplies: [
+      "Coffee Bean     (+5 Caffeine Points — the only real currency)",
+      "CEO Approved Shield  (brief invulnerability window)",
+      "Double Espresso (1.8× speed, locks Cognitive Load at 100%)",
+    ],
+    bossIntel: `THE PRODUCT DEFINITION CTHULHU  [26 HP]\nFloats unreachable. Drops Feature Tickets. Sweeps the arena.\nSLAM phase: shakes then plunges to the ground.\nTHAT is your window — hit it. Hard. With anything.`,
+  },
+  // Layer 2 — Solutions Architecture
+  {
+    lore: `Where PowerPoints go to die and diagrams achieve sentience.\nEvery solution spawns three new problems. The AWS spider\nhas nested its infra inside a monolith that predates the\nInternet. Nobody knows what it does. Nobody dares touch it.\nYou have been assigned the ticket anyway.`,
+    threats: [
+      "AWS Spider Miniboss — webs immobilise Archie, charges hard",
+      "Phantom Architect   — invisible until it's on top of you",
+      "Password Stream     — red credential columns, instant damage",
+      "GDPR Leech          — drains half a coffee on contact",
+    ],
+    supplies: [
+      "Coffee Bean     (+5 CP — ground floor currency)",
+      "CEO Approved Shield  (invulnerability — use before the web)",
+      "Double Espresso (outrun the spider's charge)",
+    ],
+    bossIntel: `THE LEGACY MONOLITH MONSTER  [56 HP]\n⚠ HAMMER ONLY — Blueprint and Wand do nothing.\nRains debris, shoots spreads, summons phantoms.\nStay mobile. Upgrade to Hammer before the gate.`,
+  },
+  // Layer 3 — The Swamp of Duplication
+  {
+    lore: `Copy-paste architecture gone feral. Every class exists in\ntriplicate; every service is a fork of a fork of a fork.\nThe swamp absorbs everything — effort, deadlines, hope.\nThe GDPR Leech is a compliance team that was never funded.\nMigration blocks have been "in progress" since 2019.`,
+    threats: [
+      "Code Ooze      — multiplies when hit by the wrong weapon",
+      "GDPR Leech     — attaches and drains coffee over time",
+      "Migration Puzzle Blocks — must be broken in the right order",
+      "Misplacement Traps — angry folders, same as Layer 1",
+    ],
+    supplies: [
+      "Coffee Bean     (+5 CP — scarcer here, ration carefully)",
+      "CEO Approved Shield  (needed against the Leech swarms)",
+      "Double Espresso (break migration blocks at full speed)",
+    ],
+    bossIntel: `THE DATA LAKE LEVIATHAN  [40 HP]\nCharges the full width of the arena at high speed.\nSummons Ooze minions during pauses.\nPredict its direction. Jump late, not early.`,
+  },
+  // Layer 4 — Hardware Hell
+  {
+    lore: `The cloud migration proposal was rejected for the third year.\nEverything is on-prem, overheating, and underfunded.\nPoC monsters roam the server room — each one a project\nthat proved the concept but never got productionised.\nCloud Zones exist. Entering one without prep hurts.`,
+    threats: [
+      "PoC Monster      — proof-of-concept creature, fast and angry",
+      "Cloud Stalker    — immune outside Cloud Zones",
+      "Shapeshifter     — invulnerable during 1s transform windows",
+      "Cloud Zone tiles — standing outside them drains your coffee",
+    ],
+    supplies: [
+      "Coffee Bean     (+5 CP — prioritise before Cloud Zones)",
+      "CEO Approved Shield  (survive the Shapeshifter burst)",
+      "Double Espresso (cross Cloud Zones before timer triggers)",
+    ],
+    bossIntel: `THE SAAS / PAAS SHAPESHIFTER  [44 HP]\nShoots 3-way spread. Summons PoC minions.\nInvulnerable for 1s on every transformation — wait it out.\nBlueprint Barrier is safest: place it, back off, repeat.`,
+  },
+  // Layer 5 — The Vulnerability Vaults
+  {
+    lore: `847 critical CVEs. Zero patches. Credentials hard-coded in\nthe repo since 2017 — it's fine, it's a private repo.\nThe pen-test report sits unread in a Confluence page that\nno one has permission to edit. The DDoS tide rolls in\nevery 15 seconds regardless of SLA commitments.`,
+    threats: [
+      "Credentials Villain — spawns password streams on contact",
+      "DDoS Tide       — periodic flood, push through or die",
+      "Firewall Nodes  — Hammer-only destruction, Recede phase only",
+      "Hash Stream     — green matrix columns, instant damage",
+    ],
+    supplies: [
+      "Coffee Bean     (+5 CP — Firewall destruction grants +25)",
+      "CEO Approved Shield  (ride out the DDoS Tide safely)",
+      "Double Espresso (sprint through Hash Streams)",
+    ],
+    bossIntel: `THE EXPOSED CREDENTIALS KINGPIN  [46 HP]\nAimshots track Archie precisely. Fires 3-way spreads.\nSummons Villain minions mid-fight.\nStay at max horizontal range — punish with Wand AOE.`,
+  },
+  // Layer 6 — The Cyborg Sanctum
+  {
+    lore: `AI has infiltrated the architecture layer. The Gluttons\nconsume every remaining compute budget. The Attention\nSeeker trained on engagement metrics and now fires\nprojectiles labelled "DISRUPT". The Sagemaker Sad Monster\nwas deprecated mid-project. Nobody told it.`,
+    threats: [
+      "Glutton         — compute hog, large hitbox, relentless",
+      "Sagemaker Sad Monster — slow but fires grief-projectiles",
+      "Attention Seeker — ranged, fires Disrupt shots in arcs",
+      "Misplacement Traps — now the whole floor is a ticket",
+    ],
+    supplies: [
+      "Coffee Bean     (+5 CP — Gluttons drop extras on death)",
+      "CEO Approved Shield  (absorb one Attention Seeker volley)",
+      "Double Espresso (dodge the Sad Monster grief-spam)",
+    ],
+    bossIntel: `THE CLAWD n8n PAPERCLIP HYPE GUY  [48 HP]\nRains debris constantly. Charges across the arena.\nSummons Gluttons every 4s. High HP — bring full coffee.\nHammer Overload clears summons AND dents the boss.`,
+  },
+  // Layer 7 — The Final Framework
+  {
+    lore: `TOGAF. The Architecture Development Method. Eight phases.\nSeven layers. One framework nobody has ever shipped intact.\nEvery previous mistake in this descent feeds the monster\nbefore you. It wears the faces of all the bosses you've\nalready beaten. There is no ticket for this. Only the patch.`,
+    threats: [
+      "All previous enemies — every layer's mob roster returns",
+      "ADM Platforms A→H — must be landed in order to expose boss",
+      "Wrong ADM order  — boss heals and resets the cycle",
+      "Everything you have survived now attacks at once",
+    ],
+    supplies: [
+      "Coffee Bean      (+5 CP — maximum stock before engaging)",
+      "CEO Approved Shield  (mandatory — boss hits hard)",
+      "Double Espresso  (required for ADM platform timing)",
+    ],
+    bossIntel: `THE TOGAF ADM FRAMEWORK MONSTER  [64 HP]\nInvulnerable until you land platforms A → B → C → D → E → F → G → H\nin sequence. Wrong order resets the cycle and partially heals.\nOn exposure: 7 mutation forms. CTO Blessing bypasses all gates.\nThis is the final ticket. Close it.`,
+  },
+];
+
+// -----------------------------------------------------------------------------
 // ARCH-42: The 7 Layers of Architecture Hell — now discrete, boss-capped levels.
 // -----------------------------------------------------------------------------
 type EnemyKind = "scopecreep" | "cockroach" | "ooze" | "poc" | "villain" | "glutton";
@@ -5919,7 +6044,7 @@ k.scene("intermission", (data: { idx: number; score: number }) => {
   });
 
   k.onKeyPress("space", () => {
-    if (hasNext) k.go("level", { idx: data.idx + 1, score: data.score });
+    if (hasNext) k.go("briefing", { idx: data.idx + 1, score: data.score });
     else k.go("win", data.score);
   });
 });
@@ -5927,6 +6052,102 @@ k.scene("intermission", (data: { idx: number; score: number }) => {
 // =============================================================================
 // SCENE: win
 // =============================================================================
+// =============================================================================
+// SCENE: briefing — pre-level dossier. One page per layer.
+// Layout: header band → LORE → THREATS → SUPPLIES → BOSS INTEL → prompt.
+// =============================================================================
+k.scene("briefing", (data: { idx: number; score: number }) => {
+  const seg  = SEGMENTS[data.idx];
+  const info = BRIEFINGS[data.idx];
+  const W = k.width();   // 800
+  const H = k.height();  // 600
+
+  // ── background + scanlines ────────────────────────────────────────────────
+  k.add([k.rect(W, H), k.pos(0, 0), k.color(10, 8, 18)]);
+  for (let y = 0; y < H; y += 4)
+    k.add([k.rect(W, 1), k.pos(0, y), k.color(0, 0, 0), k.opacity(0.15)]);
+
+  // ── header (h=44) ─────────────────────────────────────────────────────────
+  k.add([k.rect(W, 44), k.pos(0, 0), k.color(...seg.sky)]);
+  k.add([
+    k.text(`◈  ${seg.name}  ◈`, { size: 20 }),
+    k.pos(W / 2, 22), k.anchor("center"),
+    k.color(...seg.accent), k.outline(3, k.rgb(0, 0, 0)),
+  ]);
+
+  // ── vertical centre divider ────────────────────────────────────────────────
+  k.add([k.rect(1, H - 44 - 38), k.pos(W / 2, 44), k.color(50, 44, 70)]);
+
+  // ── helper: labelled section block at a fixed Y ────────────────────────────
+  //  Returns nothing — Y positions are hardcoded per block below.
+  const L = 28;          // left column x
+  const R = W / 2 + 20;  // right column x
+  const CW = W / 2 - 48; // column content width (≈376px each)
+  const FS = 11;         // body font size — small enough to avoid overflow
+
+  function head(x: number, y: number, label: string, col: [number,number,number]) {
+    k.add([k.rect(CW, 1), k.pos(x, y - 2), k.color(...col), k.opacity(0.6)]);
+    k.add([
+      k.text(label, { size: 13 }),
+      k.pos(x, y), k.color(...col), k.outline(2, k.rgb(0, 0, 0)),
+    ]);
+  }
+  function txt(x: number, y: number, t: string) {
+    k.add([k.text(t, { size: FS, width: CW }), k.pos(x, y), k.color(205, 205, 220)]);
+  }
+
+  // ── LEFT COLUMN ────────────────────────────────────────────────────────────
+  // SITUATION REPORT  y=50..175
+  head(L, 50, "▸ SITUATION REPORT", [255, 230, 120]);
+  txt(L, 68, info.lore);
+
+  // BOSS INTEL  y=220..360
+  head(L, 218, "▸ BOSS INTEL", [255, 100, 100]);
+  txt(L, 236, info.bossIntel);
+
+  // ARSENAL reminder  y=380..460
+  head(L, 374, "▸ ARSENAL", [140, 180, 255]);
+  txt(L, 392,
+    "[1] Blueprint  — barrier, low dmg\n" +
+    "[2] Hammer     — heavy; destroys DS blocks\n" +
+    "    HOLD SPACE 0.9s → OVERLOAD (self-dmg!)\n" +
+    "[3] Wand       — AOE beam drain");
+
+  // ── RIGHT COLUMN ───────────────────────────────────────────────────────────
+  // ACTIVE THREATS  y=50..190
+  head(R, 50, "▸ ACTIVE THREATS", [255, 130, 100]);
+  txt(R, 68, info.threats.map(t => `• ${t}`).join("\n"));
+
+  // AVAILABLE SUPPLIES  y=235..310
+  head(R, 232, "▸ SUPPLIES", [120, 220, 150]);
+  txt(R, 250, info.supplies.map(s => `• ${s}`).join("\n"));
+
+  // CONTROLS  y=370..460
+  head(R, 372, "▸ CONTROLS", [180, 180, 255]);
+  txt(R, 390,
+    "← → Move     ↑ Jump (↑↑ = double jump)\n" +
+    "SPACE Attack  1 / 2 / 3 Switch weapon\n" +
+    "SPACE (hold)  Hammer charge / Wand drain");
+
+  // ── footer bar ─────────────────────────────────────────────────────────────
+  k.add([k.rect(W, 38), k.pos(0, H - 38), k.color(...seg.sky), k.opacity(0.45)]);
+  k.add([
+    k.text(`STORY POINTS: ${data.score}   |   NEXT DEPLOYMENT: ${seg.name}`, { size: 12 }),
+    k.pos(W / 2, H - 20), k.anchor("center"), k.color(180, 180, 200),
+  ]);
+
+  // ── pulsing prompt ─────────────────────────────────────────────────────────
+  const prompt = k.add([
+    k.text(">> PRESS SPACE TO DEPLOY <<", { size: 17 }),
+    k.pos(W / 2, H - 62), k.anchor("center"),
+    k.color(...seg.accent), k.outline(3, k.rgb(0, 0, 0)), k.opacity(1),
+  ]);
+  prompt.onUpdate(() => { prompt.opacity = 0.5 + Math.sin(k.time() * 5) * 0.5; });
+
+  k.onKeyPress("space", () => k.go("level", { idx: data.idx, score: data.score }));
+  k.onKeyPress("enter", () => k.go("level", { idx: data.idx, score: data.score }));
+});
+
 k.scene("win", (score: number) => {
   k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(10, 16, 12)]);
   k.add([
@@ -5937,8 +6158,8 @@ k.scene("win", (score: number) => {
     k.pos(k.width() / 2, k.height() / 2), k.anchor("center"),
     k.color(58, 208, 122),
   ]);
-  k.onKeyPress("r", () => k.go("level", { idx: 0, score: 0 }));
+  k.onKeyPress("r", () => k.go("briefing", { idx: 0, score: 0 }));
 });
 
-// ARCH-71: ship it.
-k.go("level", { idx: 0, score: 0 });
+// ARCH-71: ship it — boot into the Layer 1 briefing first.
+k.go("briefing", { idx: 0, score: 0 });
