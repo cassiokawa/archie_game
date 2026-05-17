@@ -5201,23 +5201,35 @@ k.scene("level", (data: { idx: number; score: number }) => {
     });
 
     // ── STATE: BRAINSTORM — drop Feature Ticket rain ──────────────────────────
+    // ARCH-BOSS1-SPEED: faster interval, wider scatter, constant-velocity fall
+    // so players can't dodge by just standing still — tickets come from the full
+    // arena width, not just below the boss.
     boss.onStateEnter("brainstorm", () => {
       let dropped = 0;
-      const dropHandle = k.loop(0.45, () => {
-        const tx = boss.pos.x + k.rand(-70, 70);
+      const TICKET_COUNT  = 14;   // was 6
+      const DROP_INTERVAL = 0.18; // was 0.45
+      const dropHandle = k.loop(DROP_INTERVAL, () => {
+        // Scatter randomly across the full arena, not just ±70 around the boss
+        const tx = k.rand(ARENA_LEFT + 20, ARENA_RIGHT - 20);
+        // Drop height randomised slightly so they don't all arrive at once
+        const startY = boss.pos.y + k.rand(20, 60);
+        // Fall speed varies per ticket — 380-700 px/s — no two look the same
+        const fallSpeed = k.rand(380, 700);
+        // Slight lateral drift for extra chaos
+        const driftX = k.rand(-60, 60);
         k.add([
           k.sprite("ticket"),
-          k.pos(tx, boss.pos.y + 36),
+          k.pos(tx, startY),
           k.area({ scale: 0.8 }),
-          k.body(),
           k.anchor("center"),
-          k.scale(2.5),
+          k.scale(k.rand(2.0, 3.2)), // randomise size so the shadow is ambiguous
           k.z(7),
-          k.lifespan(5, { fade: 0.5 }),
+          k.lifespan(4, { fade: 0.4 }),
+          k.move(k.vec2(driftX, fallSpeed).unit().scale(fallSpeed), 1),
           "hazard", "ticket",
         ]);
         dropped++;
-        if (dropped >= 6) {
+        if (dropped >= TICKET_COUNT) {
           dropHandle.cancel();
           boss.enterState("slam");
         }
@@ -5225,7 +5237,8 @@ k.scene("level", (data: { idx: number; score: number }) => {
     });
 
     boss.onStateUpdate("brainstorm", () => {
-      boss.pos.y = HOVER_Y + Math.sin(k.time() * 3) * 6;
+      // Boss bobs faster during the blitz to match the frantic pace
+      boss.pos.y = HOVER_Y + Math.sin(k.time() * 5) * 8;
     });
 
     // ── STATE: SLAM — judder → 3-clone shuffle with PM buzzwords → AOE slam ────
@@ -5283,8 +5296,10 @@ k.scene("level", (data: { idx: number; score: number }) => {
 
       const allEntities = [boss as any, ...decoys];
 
-      // ── SWAP PHASE — entities shuffle lanes 3-5 times with PM buzzwords ──────
-      const SWAP_ROUNDS = Math.floor(k.rand(3, 6));
+      // ── SWAP PHASE — entities shuffle lanes 4-7 times with PM buzzwords ──────
+      // ARCH-BOSS1-SPEED: more rounds, faster tweens, shorter pauses = harder
+      // to track the real boss by eye.
+      const SWAP_ROUNDS = Math.floor(k.rand(4, 8));
       for (let round = 0; round < SWAP_ROUNDS; round++) {
         if (!boss.exists()) break;
 
@@ -5294,6 +5309,10 @@ k.scene("level", (data: { idx: number; score: number }) => {
           const j = Math.floor(k.rand(0, i + 1));
           [order[i], order[j]] = [order[j], order[i]];
         }
+
+        // Tween speed escalates each round so the last few swaps are a blur
+        const swapDur = Math.max(0.12, 0.30 - round * 0.03);
+        const waitDur = Math.max(0.14, 0.36 - round * 0.03);
 
         // Tween each entity to its new lane + spray a PM buzzword above it
         for (let ei = 0; ei < 3; ei++) {
@@ -5308,15 +5327,15 @@ k.scene("level", (data: { idx: number; score: number }) => {
             k.color(255, 220, 80),
             k.outline(2, k.rgb(16, 16, 24)),
             k.z(25),
-            k.lifespan(0.5, { fade: 0.25 }),
+            k.lifespan(0.4, { fade: 0.20 }),
           ]);
 
-          k.tween(ent.pos.x, targetX, 0.42,
+          k.tween(ent.pos.x, targetX, swapDur,
             (v) => { if (ent.exists()) ent.pos.x = v; },
             k.easings.easeInOutSine);
         }
 
-        await k.wait(0.52);
+        await k.wait(waitDur);
       }
 
       if (!boss.exists()) {
@@ -5325,11 +5344,13 @@ k.scene("level", (data: { idx: number; score: number }) => {
       }
 
       // ── FINAL PLUNGE — all three drop simultaneously ──────────────────────────
+      // ARCH-BOSS1-SPEED: 0.09s tween (was 0.18) — basically instant; gives
+      // the player almost no reaction window once the real one commits.
       for (const d of decoys) {
-        if (d.exists()) k.tween(d.pos.y, SLAM_Y, 0.18,
+        if (d.exists()) k.tween(d.pos.y, SLAM_Y, 0.09,
           (v) => { if (d.exists()) d.pos.y = v; }, k.easings.easeInQuad);
       }
-      await k.tween(boss.pos.y, SLAM_Y, 0.18,
+      await k.tween(boss.pos.y, SLAM_Y, 0.09,
         (v) => { boss.pos.y = v; }, k.easings.easeInQuad);
 
       k.shake(10);
@@ -5382,6 +5403,23 @@ k.scene("level", (data: { idx: number; score: number }) => {
           [255, 120, 60]);
       }
 
+      // Bonus shrapnel burst — 5 tickets fly outward from the impact point
+      // so players near the slam zone get peppered even if they dodged the AOE.
+      for (let i = 0; i < 5; i++) {
+        const ang = k.rand(-Math.PI * 0.9, -Math.PI * 0.1); // upward fan
+        const spd  = k.rand(260, 480);
+        k.add([
+          k.sprite("ticket"),
+          k.pos(boss.pos.x + k.rand(-30, 30), boss.pos.y),
+          k.area({ scale: 0.7 }),
+          k.anchor("center"),
+          k.scale(k.rand(1.8, 2.8)),
+          k.z(7),
+          k.lifespan(2.5, { fade: 0.5 }),
+          k.move(k.vec2(Math.cos(ang), Math.sin(ang)), spd),
+          "hazard", "ticket",
+        ]);
+      }
       // Final PM buzzword at landing
       popup(boss.pos.add(k.vec2(0, -72)), buzzword(), [255, 230, 100]);
 
